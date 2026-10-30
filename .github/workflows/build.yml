@@ -37,7 +37,7 @@ jobs:
           set -euo pipefail
 
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          if [[ ! -d "$SDK_ROOT" ]]; then
+          if [ ! -d "$SDK_ROOT" ]; then
             echo "ERROR: Android SDK directory not found: $SDK_ROOT"
             exit 1
           fi
@@ -47,7 +47,7 @@ jobs:
           echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
 
           SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager -print 2>/dev/null | sort -V | tail -n 1 || true)"
-          if [[ -z "$SDKMANAGER" ]]; then
+          if [ -z "$SDKMANAGER" ]; then
             echo "ERROR: sdkmanager not found under $SDK_ROOT/cmdline-tools."
             exit 1
           fi
@@ -65,57 +65,3 @@ jobs:
         id: source
         shell: bash
         run: |
-          set -euo pipefail
-
-          if [[ -f settings.gradle || -f settings.gradle.kts ]]; then
-            PROJECT_DIR="$GITHUB_WORKSPACE"
-          else
-            ZIP_PATH="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" -- '*.zip' | head -n 1 || true)"
-
-            if [[ -z "$ZIP_PATH" ]]; then
-              ZIP_PATH="$(find . -maxdepth 3 -type f -name '*.zip' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2- | sed 's#^./##')"
-            fi
-
-            if [[ -z "$ZIP_PATH" \vert{}\vert{} ! -f "$ZIP_PATH" ]]; then
-              echo "ERROR: No source ZIP found."
-              exit 1
-            fi
-
-            mkdir -p "$RUNNER_TEMP/carplay-launcher-source"
-            unzip -q "$ZIP_PATH" -d "$RUNNER_TEMP/carplay-launcher-source"
-
-            SETTINGS_FILE="$(find "$RUNNER_TEMP/carplay-launcher-source" -maxdepth 6 \( -name settings.gradle -o -name settings.gradle.kts \) -type f | head -n 1)"
-            PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
-          fi
-
-          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Gradle 8.9
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
-      - name: Build Android APK (Debug)
-        working-directory: ${{ steps.source.outputs.project_dir }}
-        env:
-          GITHUB_RUN_NUMBER: ${{ github.run_number }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          # Budujemy wersję Debug (automatycznie podpisaną kluczem testowym Androida)
-          gradle --no-daemon --stacktrace clean assembleDebug
-
-          APK="app/build/outputs/apk/debug/app-debug.apk"
-          if [[ ! -s "$APK" ]]; then
-            echo "ERROR: Debug APK was not generated: $APK"
-            exit 1
-          fi
-
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
-
-          mkdir -p "$RUNNER_TEMP/release-assets"
-          # Nadanie plikowi nazwy z numerem wersji
-          cp "$APK" "$RUNNER_TEMP/release-assets/CarPlay-Launcher-v1.0.${GITHUB_RUN_NUMBER}.apk"
-          (
-            cd
