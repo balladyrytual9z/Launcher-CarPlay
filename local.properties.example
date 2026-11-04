@@ -1,0 +1,8 @@
+
+
+## Copy to local.properties and set your SDK path when building outside CI.
+# sdk.dir=/path/to/Android/Sdk
+
+
+
+

@@ -1,0 +1,17 @@
+
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings windows: translucent so dock stays visible beside them -->
+    <style name="Dock.Night" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+    <style name="Dock.Day" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+</resources>
+
+
+
+
