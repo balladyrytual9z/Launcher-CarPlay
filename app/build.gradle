@@ -1,0 +1,70 @@
+
+
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'pl.dock.widget'
+    compileSdk 35
+
+    def debugKeystore = file('dock-debug.p12')
+    if (debugKeystore.exists()) {
+        signingConfigs {
+            debug {
+                storeFile debugKeystore
+                storePassword 'dockdock'
+                keyAlias 'dock'
+                keyPassword 'dockdock'
+                storeType 'pkcs12'
+            }
+        }
+    }
+
+    defaultConfig {
+        applicationId 'pl.dock.widget'
+        minSdk 26
+        targetSdk 28
+        versionCode 4
+        versionName '1.0.6-dock2-nightshift'
+    }
+
+    buildTypes {
+        debug {
+            if (debugKeystore.exists()) {
+                signingConfig signingConfigs.debug
+            }
+            minifyEnabled false
+        }
+        release {
+            minifyEnabled false
+            if (debugKeystore.exists()) {
+                signingConfig signingConfigs.debug
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    packaging {
+        resources {
+            excludes += ['META-INF/INDEX.LIST', 'META-INF/DEPENDENCIES']
+        }
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+
+dependencies {
+    // pure Android framework – no AndroidX
+}
+
+
+
+
