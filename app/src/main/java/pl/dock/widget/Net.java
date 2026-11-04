@@ -1,0 +1,264 @@
+
+
+
+package pl.dock.widget;
+
+import android.bluetooth.BluetoothAdapter;
+import android.content.Context;
+import android.content.Intent;
+import android.provider.Settings;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
+import android.net.wifi.WifiManager;
+
+import java.lang.reflect.Method;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
+import java.util.Locale;
+
+// Stan BT / WiFi / tetheringu tabletu
+public class Net {
+
+    public static boolean bluetoothOn() {
+        try {
+            BluetoothAdapter a = BluetoothAdapter.getDefaultAdapter();
+            return a != null && a.isEnabled();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static WifiManager wm(Context c) {
+        return (WifiManager) c.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+    }
+
+    public static boolean wifiEnabled(Context c) {
+        try {
+            WifiManager w = wm(c);
+            return w != null && w.isWifiEnabled();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    public static boolean wifiConnected(Context c) {
+        try {
+            if (!wifiEnabled(c)) return false;
+            ConnectivityManager cm = (ConnectivityManager)
+                    c.getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo ni = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+            return ni != null && ni.isConnected();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // 0 = Wi-Fi wyłączone, 1 = włączone, brak sieci, 2 = połączone bez internetu, 3 = połączone z internetem
+    public static int wifiState(Context c) {
+        if (!wifiEnabled(c)) return 0;
+        if (!wifiConnected(c)) return 1;
+        try {
+            ConnectivityManager cm = (ConnectivityManager) c.getSystemService(Context.CONNECTIVITY_SERVICE);
+            for (Network n : cm.getAllNetworks()) {
+                NetworkCapabilities nc = cm.getNetworkCapabilities(n);
+                if (nc != null && nc.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                    return nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ? 3 : 2;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return 3;
+    }
+
+    // hotspot WiFi (ukryte API przez refleksję); null = brak odczytu
+    public static Boolean apEnabled(Context c) {
+        try {
+            Method m = WifiManager.class.getDeclaredMethod("isWifiApEnabled");
+            m.setAccessible(true);
+            return (Boolean) m.invoke(wm(c));
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    public static String[] tetheredIfaces(Context c) {
+        try {
+            ConnectivityManager cm = (ConnectivityManager)
+                    c.getSystemService(Context.CONNECTIVITY_SERVICE);
+            Method m = ConnectivityManager.class.getDeclaredMethod("getTetheredIfaces");
+            m.setAccessible(true);
+            return (String[]) m.invoke(cm);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    // czy działa interfejs typowy dla tetheringu (hotspot, USB, BT)
+    public static boolean tetherInterfaceUp() {
+        try {
+            Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces();
+            while (en != null && en.hasMoreElements()) {
+                NetworkInterface ni = en.nextElement();
+                if (!ni.isUp() || ni.isLoopback()) continue;
+                String n = ni.getName().toLowerCase(Locale.US);
+                boolean nameHit = n.startsWith("ap") || n.startsWith("softap")
+                        || n.startsWith("swlan") || n.startsWith("rndis")
+                        || n.startsWith("bt-pan") || n.startsWith("usb") || n.startsWith("ncm");
+                Enumeration<InetAddress> ad = ni.getInetAddresses();
+                while (ad.hasMoreElements()) {
+                    InetAddress a = ad.nextElement();
+                    if (!(a instanceof Inet4Address)) continue;
+                    String h = a.getHostAddress();
+                    if (nameHit) return true;
+                    if (h.equals("192.168.43.1") || h.equals("192.168.42.129")
+                            || h.equals("192.168.44.1")) return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    public static boolean tethering(Context c) {
+        Boolean ap = apEnabled(c);
+        if (ap != null && ap) return true;
+        String[] t = tetheredIfaces(c);
+        if (t != null && t.length > 0) return true;
+        return tetherInterfaceUp();
+    }
+
+    public static String interfaces() {
+        StringBuilder b = new StringBuilder();
+        try {
+            Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces();
+            while (en != null && en.hasMoreElements()) {
+                NetworkInterface ni = en.nextElement();
+                b.append("  ").append(ni.getName()).append(ni.isUp() ? " [up]" : " [down]");
+                Enumeration<InetAddress> ad = ni.getInetAddresses();
+                while (ad.hasMoreElements()) {
+                    InetAddress a = ad.nextElement();
+                    if (a instanceof Inet4Address) b.append(" ").append(a.getHostAddress());
+                }
+                b.append("\n");
+            }
+        } catch (Throwable t) {
+            b.append("  brak odczytu\n");
+        }
+        return b.toString();
+    }
+
+    // ---------------------------------------------------------------- przełączanie
+
+    public static boolean setWifi(Context c, boolean on) {
+        try {
+            WifiManager w = wm(c);
+            return w != null && w.setWifiEnabled(on);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    public static boolean setBluetooth(boolean on) {
+        try {
+            BluetoothAdapter a = BluetoothAdapter.getDefaultAdapter();
+            if (a == null) return false;
+            return on ? a.enable() : a.disable();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    // Zwraca: "ok" (przełączono), "settings" (otwarto ustawienia systemu), "fail".
+    // Zwykła aplikacja na Androidzie 9 zwykle nie może włączyć hotspotu sama.
+    public static String setTethering(Context c, boolean on) {
+        try {
+            Class<?> cfg = Class.forName("android.net.wifi.WifiConfiguration");
+            Method m = WifiManager.class.getDeclaredMethod("setWifiApEnabled", cfg, boolean.class);
+            m.setAccessible(true);
+            Object r = m.invoke(wm(c), null, on);
+            if (Boolean.TRUE.equals(r)) return "ok";
+        } catch (Throwable ignored) {
+        }
+        return openTetherSettings(c) ? "settings" : "fail";
+    }
+
+    public static boolean openTetherSettings(Context c) {
+        // najpierw wprost ekran "Hotspot Wi-Fi", potem ogólny "Hotspot i tethering"
+        try {
+            Intent direct = new Intent();
+            direct.setClassName("com.android.settings", "com.android.settings.SubSettings");
+            direct.putExtra(":settings:show_fragment", "com.android.settings.wifi.tether.WifiTetherSettings");
+            direct.putExtra(":settings:show_fragment_title_resid", 0);
+            direct.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            c.startActivity(direct);
+            return true;
+        } catch (Throwable ignored) {
+        }
+        Intent[] tries = {
+                new Intent().setClassName("com.android.settings", "com.android.settings.TetherSettings"),
+                new Intent("android.settings.TETHER_SETTINGS"),
+                new Intent(Settings.ACTION_WIRELESS_SETTINGS),
+                new Intent(Settings.ACTION_SETTINGS)
+        };
+        for (Intent i : tries) {
+            try {
+                if (i.resolveActivity(c.getPackageManager()) == null) continue;
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                c.startActivity(i);
+                return true;
+            } catch (Throwable ignored) {
+            }
+        }
+        return false;
+    }
+
+    // ---------------------------------------------------------------- skróty do ustawień / aplikacji
+
+    public static boolean openWifiSettings(Context c) {
+        return startFirst(c, new Intent(Settings.ACTION_WIFI_SETTINGS));
+    }
+
+    public static boolean openBluetoothSettings(Context c) {
+        return startFirst(c, new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
+    }
+
+    // aplikacja Bluetooth radia (pakiet z ustawień); gdy jej nie ma – ustawienia systemowe
+    public static boolean openBluetoothApp(Context c) {
+        // kolejne próby: pakiet z ustawień → typowe OEM → ustawienia Bluetooth
+        String[] tries = {Prefs.btPkg(c), "com.syu.bt", "com.ts.bt", "com.ts.MainUI"};
+        for (String pkg : tries) {
+            try {
+                Intent i = pkg == null || pkg.length() == 0 ? null
+                        : c.getPackageManager().getLaunchIntentForPackage(pkg);
+                if (i != null) {
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    c.startActivity(i);
+                    return true;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return openBluetoothSettings(c);
+    }
+
+    private static boolean startFirst(Context c, Intent i) {
+        try {
+            if (i.resolveActivity(c.getPackageManager()) == null) return false;
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            c.startActivity(i);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+}
+
+
+
+
+
