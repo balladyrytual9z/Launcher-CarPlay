@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.app.Activity;
@@ -22,7 +19,6 @@ public class ConnectivityActivity extends BaseActivity {
         setTheme(android.R.style.Theme_Translucent_NoTitleBar);
         super.onCreate(b);
         Ui.dockWindow(getWindow(), this);
-        applyImmersive();
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0x66000000);
         root.setOnClickListener(new View.OnClickListener() {
@@ -47,15 +43,6 @@ public class ConnectivityActivity extends BaseActivity {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP | (Ui.dockLeft(this) ? Gravity.START : Gravity.END));
         lp.setMargins(Ui.dp(this, 8), Ui.dp(this, 12), Ui.dp(this, 8), Ui.dp(this, 8));
-        // otwarcie gestem od dołu: centrujemy panel nad miejscem gestu
-        float sx = getIntent() == null ? -1f : getIntent().getFloatExtra("swipe_x", -1f);
-        if (sx >= 0f) {
-            int cx = (int) sx - w / 2;
-            int maxM = Ui.windowWidth(this) - w - Ui.dp(this, 8);
-            cx = Math.max(Ui.dp(this, 8), Math.min(cx, maxM));
-            lp.gravity = Gravity.TOP | Gravity.LEFT;
-            lp.leftMargin = cx;
-        }
         root.addView(panel, lp);
         setContentView(root);
     }
@@ -64,24 +51,6 @@ public class ConnectivityActivity extends BaseActivity {
     protected void onNewIntent(Intent i) {
         super.onNewIntent(i);
         finish();
-    }
-
-    private void applyImmersive() {
-        try {
-            getWindow().getDecorView().setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                            | View.SYSTEM_UI_FLAG_FULLSCREEN);
-        } catch (Throwable ignored) {}
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) applyImmersive();
     }
 }
 

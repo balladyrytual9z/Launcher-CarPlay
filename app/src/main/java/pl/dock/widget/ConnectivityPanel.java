@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.app.Activity;
@@ -41,14 +38,10 @@ public class ConnectivityPanel extends LinearLayout {
     private final Activity act;
     private final boolean night;
     private final Host host;
-    private final Tile[] slots = new Tile[3];
-    private final int[] slotFunc = {0, 1, 2};   // 0 Wi-Fi, 1 Bluetooth, 2 hotspot
-    private int dragIdx = -1;
-    private RoundBtn bMode, bShift;
-    private PillSlider volSlider, briSlider;
+    private Tile tWifi, tBt, tHot;
+    private RoundBtn bDay, bNight, bAuto, bShift;
     private TextView note;
     private BroadcastReceiver rc;
-    private android.database.ContentObserver volObs;
 
     private int dp(float v) {
         return Ui.dp(act, v);
@@ -71,50 +64,40 @@ public class ConnectivityPanel extends LinearLayout {
         LinearLayout top = new LinearLayout(act);
         top.setOrientation(HORIZONTAL);
 
-        // kolumna kafelków (kolejność zamienna przeciąganiem)
         LinearLayout left = new LinearLayout(act);
         left.setOrientation(VERTICAL);
-        for (int i = 0; i < slots.length; i++) {
-            final int idx = i;
-            slots[i] = new Tile(act, false);
-            LayoutParams tp = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(116));
-            if (i > 0) tp.topMargin = dp(6);
-            left.addView(slots[i], tp);
-            slots[i].setOnLongClickListener(new OnLongClickListener() {
-                @Override
-                public boolean onLongClick(View v) {
-                    beginDrag(idx);
-                    return true;
-                }
-            });
-            slots[i].setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    if (dragIdx >= 0) return;
-                    tileAction(slotFunc[idx]);
-                }
-            });
-        }
-        top.addView(left, new LayoutParams(dp(330), ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout row1 = new LinearLayout(act);
+        tWifi = new Tile(act, false);
+        tBt = new Tile(act, false);
+        LayoutParams l1 = new LayoutParams(0, dp(140), 1f);
+        l1.rightMargin = dp(6);
+        LayoutParams l2 = new LayoutParams(0, dp(140), 1f);
+        l2.leftMargin = dp(6);
+        row1.addView(tWifi, l1);
+        row1.addView(tBt, l2);
+        left.addView(row1);
+        tHot = new Tile(act, true);
+        LayoutParams l3 = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(72));
+        l3.topMargin = dp(12);
+        left.addView(tHot, l3);
+        top.addView(left, new LayoutParams(dp(400), ViewGroup.LayoutParams.WRAP_CONTENT));
 
         if (Prefs.customBars(act)) {
             LinearLayout bars = new LinearLayout(act);
             bars.setOrientation(HORIZONTAL);
-            volSlider = new PillSlider(act, false, volumeValue());
-            briSlider = new PillSlider(act, true, brightnessValue());
-            LayoutParams bp = new LayoutParams(dp(64), dp(196));
+            PillSlider vol = new PillSlider(act, false, volumeValue());
+            PillSlider bri = new PillSlider(act, true, brightnessValue());
+            LayoutParams bp = new LayoutParams(dp(70), ViewGroup.LayoutParams.MATCH_PARENT);
             bp.leftMargin = dp(10);
-            bars.addView(volSlider, bp);
-            LayoutParams bp2 = new LayoutParams(dp(64), dp(196));
-            bp2.leftMargin = dp(6);
-            bars.addView(briSlider, bp2);
-            volSlider.setListener(new PillSlider.Listener() {
+            bars.addView(vol, bp);
+            bars.addView(bri, bp);
+            vol.setListener(new PillSlider.Listener() {
                 @Override
                 public void on(float v) {
                     setVolume(v);
                 }
             });
-            briSlider.setListener(new PillSlider.Listener() {
+            bri.setListener(new PillSlider.Listener() {
                 @Override
                 public void on(float v) {
                     setBrightness(v);
@@ -133,12 +116,33 @@ public class ConnectivityPanel extends LinearLayout {
                     ViewGroup.LayoutParams.WRAP_CONTENT);
             rp.topMargin = dp(12);
             if (showMode) {
-                bMode = new RoundBtn(act, 2, modeLabel());
-                row.addView(bMode, new LayoutParams(dp(96), dp(96)));
-                bMode.setOnClickListener(new OnClickListener() {
+                bDay = new RoundBtn(act, 0, "Jasny");
+                bNight = new RoundBtn(act, 1, "Ciemny");
+                bAuto = new RoundBtn(act, 2, "Auto");
+                row.addView(bDay, new LayoutParams(dp(88), dp(96)));
+                row.addView(bNight, new LayoutParams(dp(88), dp(96)));
+                row.addView(bAuto, new LayoutParams(dp(88), dp(96)));
+                bDay.setOnClickListener(new OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        cycleMode();
+                        Prefs.setFollowSystem(act, false);
+                        Prefs.setMode(act, "day");
+                        applyMode();
+                    }
+                });
+                bNight.setOnClickListener(new OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        Prefs.setFollowSystem(act, false);
+                        Prefs.setMode(act, "night");
+                        applyMode();
+                    }
+                });
+                bAuto.setOnClickListener(new OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        Prefs.setFollowSystem(act, true);
+                        applyMode();
                     }
                 });
             }
@@ -164,94 +168,53 @@ public class ConnectivityPanel extends LinearLayout {
             note.setPadding(dp(6), dp(2), 0, dp(4));
             addView(note);
         }
-    }
 
-    // akcja kliknięcia kafelka wg funkcji w slocie
-    private void tileAction(int func) {
-        if (func == 0) {
-            Net.openWifiSettings(act);
-            host.close();
-        } else if (func == 1) {
-            toggleBt();
-        } else {
-            Net.openTetherSettings(act);
-            host.close();
-        }
-    }
-
-    // ustawienia funkcji (puszczenie na tym samym kafelku po przeciągnięciu)
-    private void tileSettings(int func) {
-        if (func == 0) {
-            Net.openWifiSettings(act);
-        } else if (func == 1) {
-            Net.openBluetoothSettings(act);
-        } else {
-            Net.openTetherSettings(act);
-        }
-        host.close();
-    }
-
-    // ---------------------------------------------------------------- przeciąganie kafelków
-    private void beginDrag(int idx) {
-        dragIdx = idx;
-        setOnTouchListener(new OnTouchListener() {
+        tWifi.setOnClickListener(new OnClickListener() {
             @Override
-            public boolean onTouch(View v, MotionEvent e) {
-                if (e.getActionMasked() == MotionEvent.ACTION_UP
-                        || e.getActionMasked() == MotionEvent.ACTION_CANCEL) {
-                    finishDrag(e.getRawX(), e.getRawY());
-                    return true;
-                }
-                return false;
+            public void onClick(View v) {
+                // Android nie pozwala przełączać Wi-Fi z aplikacji: od razu ekran Wi-Fi w ustawieniach
+                Net.openWifiSettings(act);
+                host.close();
             }
         });
-    }
-
-    private void finishDrag(float rawX, float rawY) {
-        setOnTouchListener(null);
-        int from = dragIdx;
-        dragIdx = -1;
-        if (from < 0) return;
-        int to = slotAtScreen(rawX, rawY);
-        if (to < 0) return;
-        if (to == from) {
-            tileSettings(slotFunc[from]);
-            return;
-        }
-        int tmp = slotFunc[from];
-        slotFunc[from] = slotFunc[to];
-        slotFunc[to] = tmp;
-        update();
-    }
-
-    private int slotAtScreen(float rawX, float rawY) {
-        int[] loc = new int[2];
-        for (int i = 0; i < slots.length; i++) {
-            slots[i].getLocationOnScreen(loc);
-            if (rawX >= loc[0] && rawX <= loc[0] + slots[i].getWidth()
-                    && rawY >= loc[1] && rawY <= loc[1] + slots[i].getHeight()) {
-                return i;
+        tWifi.setOnLongClickListener(new OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                Net.openWifiSettings(act);
+                host.close();
+                return true;
             }
-        }
-        return -1;
-    }
-
-    // jeden przycisk trybu: Auto -> Jasny -> Ciemny
-    private String modeLabel() {
-        if (Prefs.followSystem(act)) return "Auto";
-        return "night".equals(Prefs.mode(act)) ? "Ciemny" : "Jasny";
-    }
-
-    private void cycleMode() {
-        if (Prefs.followSystem(act)) {
-            Prefs.setFollowSystem(act, false);
-            Prefs.setMode(act, "day");
-        } else if ("day".equals(Prefs.mode(act))) {
-            Prefs.setMode(act, "night");
-        } else {
-            Prefs.setFollowSystem(act, true);
-        }
-        applyMode();
+        });
+        tBt.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleBt();
+            }
+        });
+        tBt.setOnLongClickListener(new OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                Net.openBluetoothSettings(act);
+                host.close();
+                return true;
+            }
+        });
+        tHot.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String r = Net.setTethering(act, !Net.tethering(act));
+                if (!"ok".equals(r)) host.close();   // otwarto ekran Hotspot Wi-Fi
+                update();
+            }
+        });
+        tHot.setOnLongClickListener(new OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                Net.openTetherSettings(act);
+                host.close();
+                return true;
+            }
+        });
     }
 
     private void applyMode() {
@@ -343,28 +306,20 @@ public class ConnectivityPanel extends LinearLayout {
         boolean bt = Net.bluetoothOn();
         boolean th = Net.tethering(act);
         int white = 0xFFFFFFFF;
-        for (int i = 0; i < slots.length; i++) {
-            int f = slotFunc[i];
-            if (f == 0) {
-                slots[i].set(wEn, 0xFF1C94FF,
-                        Icons.vector(act, wEn ? R.drawable.ic_wifi : R.drawable.ic_wifi_off, 128, white),
-                        "Wi-Fi", ws == 3 ? "Połączono" : (ws == 2 ? "Brak internetu"
-                        : (ws == 1 ? "Włączone" : "Wyłączone")));
-            } else if (f == 1) {
-                slots[i].set(bt, 0xFF1C94FF, Icons.vector(act, R.drawable.ic_bt, 128, white),
-                        "Bluetooth", BtDevice.isConnected(act) && Prefs.btDevice(act).length() > 0
-                                ? "Telefon połączony" : (bt ? "Włączony" : "Wyłączony"));
-            } else {
-                slots[i].set(th, 0xFF30D158, Icons.tether(128, white, false),
-                        "Hotspot osobisty", th ? "Włączony" : "Wyłączony");
-            }
-        }
+        tWifi.set(wEn, 0xFF1C94FF, Icons.vector(act, wEn ? R.drawable.ic_wifi : R.drawable.ic_wifi_off,
+                128, white), "Wi-Fi", ws == 3 ? "Połączono" : (ws == 2 ? "Brak internetu"
+                : (ws == 1 ? "Włączone" : "Wyłączone")));
+        tBt.set(bt, 0xFF1C94FF, Icons.vector(act, R.drawable.ic_bt, 128, white), "Bluetooth",
+                BtDevice.isConnected(act) && Prefs.btDevice(act).length() > 0
+                        ? "Telefon połączony" : (bt ? "Włączony" : "Wyłączony"));
+        tHot.set(th, 0xFF30D158, Icons.tether(128, white, false), "Hotspot osobisty",
+                th ? "Włączony" : "Wyłączony");
         boolean follow = Prefs.followSystem(act);
         String m = Prefs.mode(act);
-        if (bMode != null) {
-            bMode.setKind(follow ? 2 : ("night".equals(m) ? 1 : 0));
-            bMode.setLabel(modeLabel());
-            bMode.setActive(true);
+        if (bDay != null) {
+            bDay.setActive(!follow && "day".equals(m));
+            bNight.setActive(!follow && "night".equals(m));
+            bAuto.setActive(follow);
         }
         if (bShift != null) bShift.setActive(NightShift.isOn(act));
         if (note != null) {
@@ -393,27 +348,6 @@ public class ConnectivityPanel extends LinearLayout {
             act.registerReceiver(rc, f);
         } catch (Throwable ignored) {
         }
-        // głośność zmieniona z zewnątrz (przyciski/z kierownicy) -> odśwież suwak
-        try {
-            volObs = new android.database.ContentObserver(new android.os.Handler()) {
-                @Override
-                public void onChange(boolean selfChange) {
-                    if (volSlider != null) {
-                        final float v = volumeValue();
-                        post(new Runnable() {
-                            @Override
-                            public void run() {
-                                volSlider.setExternal(v);
-                            }
-                        });
-                    }
-                }
-            };
-            act.getContentResolver().registerContentObserver(
-                    android.provider.Settings.System.getUriFor("volume_music_speaker"),
-                    true, volObs);
-        } catch (Throwable ignored) {
-        }
         update();
     }
 
@@ -425,11 +359,6 @@ public class ConnectivityPanel extends LinearLayout {
         } catch (Throwable ignored) {
         }
         rc = null;
-        try {
-            if (volObs != null) act.getContentResolver().unregisterContentObserver(volObs);
-        } catch (Throwable ignored) {
-        }
-        volObs = null;
     }
 
     // ---------------------------------------------------------------- kafelek
@@ -534,8 +463,8 @@ public class ConnectivityPanel extends LinearLayout {
 
     // ---------------------------------------------------------------- okrągły przycisk z podpisem
     private class RoundBtn extends View {
-        private int kind;   // 0 jasny, 1 ciemny, 2 auto, 3 Night Shift
-        private String label;
+        private final int kind;   // 0 jasny, 1 ciemny, 2 auto, 3 Night Shift
+        private final String label;
         private boolean active;
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final float d = getResources().getDisplayMetrics().density;
@@ -545,17 +474,6 @@ public class ConnectivityPanel extends LinearLayout {
             this.kind = kind;
             this.label = label;
             setContentDescription(label);
-        }
-
-        void setKind(int k) {
-            kind = k;
-            invalidate();
-        }
-
-        void setLabel(String l) {
-            label = l;
-            setContentDescription(l);
-            invalidate();
         }
 
         void setActive(boolean a) {
@@ -633,12 +551,6 @@ public class ConnectivityPanel extends LinearLayout {
 
         public void setListener(Listener l) {
             this.l = l;
-        }
-
-        // ustawienie wartości z zewnątrz (np. ContentObserver głośności)
-        public void setExternal(float v) {
-            value = Math.max(0f, Math.min(1f, v));
-            invalidate();
         }
 
         @Override

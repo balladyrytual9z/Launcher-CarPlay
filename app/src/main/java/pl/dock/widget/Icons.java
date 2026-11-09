@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.content.Context;
@@ -324,18 +321,15 @@ public class Icons {
         Paint st = new Paint(Paint.ANTI_ALIAS_FLAG);
         st.setStyle(Paint.Style.STROKE);
         st.setStrokeCap(Paint.Cap.ROUND);
-        st.setStrokeWidth(s * 0.13f);
+        st.setStrokeWidth(s * 0.10f);
         st.setColor(color);
-        // arc 240 degrees, open on the right side (like the Apple CarPlay logo)
-        cv.drawArc(new RectF(s * 0.14f, s * 0.14f, s * 0.86f, s * 0.86f),
-                35f, 290f, false, st);
-        // play triangle centered inside the arc
+        cv.drawArc(new RectF(s * 0.12f, s * 0.12f, s * 0.88f, s * 0.88f), 40, 280, false, st);
         Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         fill.setColor(color);
         Path t = new Path();
-        t.moveTo(s * 0.44f, s * 0.32f);
-        t.lineTo(s * 0.72f, s * 0.50f);
-        t.lineTo(s * 0.44f, s * 0.68f);
+        t.moveTo(s * 0.40f, s * 0.30f);
+        t.lineTo(s * 0.74f, s * 0.50f);
+        t.lineTo(s * 0.40f, s * 0.70f);
         t.close();
         cv.drawPath(t, fill);
         Bitmap out = centered(b);
@@ -357,8 +351,8 @@ public class Icons {
         Bitmap b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(b);
         float s = size;
-        float sw = s * 0.11f;            // thicker line (iOS uses ~11%)
-        float gap = s * 0.055f;
+        float sw = s * 0.085f;
+        float gap = s * 0.05f;
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         p.setStyle(Paint.Style.STROKE);
         p.setStrokeWidth(sw);
@@ -368,24 +362,22 @@ public class Icons {
         clear.setStrokeWidth(sw + 2 * gap);
         clear.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
 
-        RectF a = new RectF(s * 0.10f, s * 0.18f, s * 0.66f, s * 0.50f);
-        RectF d = new RectF(s * 0.34f, s * 0.40f, s * 0.90f, s * 0.72f);
+        RectF a = new RectF(s * 0.08f, s * 0.16f, s * 0.68f, s * 0.50f);
+        RectF d = new RectF(s * 0.32f, s * 0.38f, s * 0.92f, s * 0.72f);
         float r = a.height() / 2f;
 
-        // top link
         cv.drawRoundRect(a, r, r, p);
-        // cut-out for the bottom link so they do not overlap
+
         Path c1 = new Path();
-        c1.addCircle(s * 0.33f, s * 0.50f, s * 0.10f, Path.Direction.CW);
+        c1.addCircle(s * 0.33f, s * 0.50f, s * 0.11f, Path.Direction.CW);
         cv.save();
         cv.clipPath(c1);
         cv.drawRoundRect(d, r, r, clear);
         cv.restore();
-        // bottom link on top
         cv.drawRoundRect(d, r, r, p);
-        // cut-out for the top link at the second contact point
+
         Path c2 = new Path();
-        c2.addCircle(s * 0.67f, s * 0.40f, s * 0.10f, Path.Direction.CW);
+        c2.addCircle(s * 0.67f, s * 0.38f, s * 0.11f, Path.Direction.CW);
         cv.save();
         cv.clipPath(c2);
         cv.drawRoundRect(a, r, r, clear);
@@ -396,14 +388,14 @@ public class Icons {
             Paint cl = new Paint(Paint.ANTI_ALIAS_FLAG);
             cl.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
             cl.setStyle(Paint.Style.STROKE);
-            cl.setStrokeWidth(s * 0.22f);
-            cv.drawLine(s * 0.14f, s * 0.08f, s * 0.86f, s * 0.80f, cl);
+            cl.setStrokeWidth(s * 0.20f);
+            cv.drawLine(s * 0.16f, s * 0.10f, s * 0.84f, s * 0.78f, cl);
             Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
             line.setStyle(Paint.Style.STROKE);
             line.setStrokeCap(Paint.Cap.ROUND);
             line.setStrokeWidth(sw);
             line.setColor(color);
-            cv.drawLine(s * 0.14f, s * 0.08f, s * 0.86f, s * 0.80f, line);
+            cv.drawLine(s * 0.16f, s * 0.10f, s * 0.84f, s * 0.78f, line);
         }
         return centered(b);
     }

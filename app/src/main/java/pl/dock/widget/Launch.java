@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.content.Context;
@@ -43,13 +40,11 @@ public class Launch {
         if (act.length() > 0) {
             Intent i = new Intent(Intent.ACTION_MAIN);
             i.setClassName(pkg, act);
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                    | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             return i;
         }
         Intent l = c.getPackageManager().getLaunchIntentForPackage(pkg);
-        if (l != null) l.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+        if (l != null) l.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         return l;
     }
 

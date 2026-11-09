@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.content.Context;
@@ -39,6 +36,7 @@ public class DockView extends View {
     private final float d;
     private Listener listener;
     private boolean night = true, glass, showVolt;
+    private Bitmap glassBmp;
     private float blend;            // 0..1: strona widżetów w trybie dziennym robi dock nocny
     private String clock = "--:--";
     private String volt = "";
@@ -142,6 +140,11 @@ public class DockView extends View {
         invalidate();
     }
 
+    public void setGlassBitmap(Bitmap b) {
+        this.glassBmp = b;
+        invalidate();
+    }
+
     // strona widżetów: dock płynnie przechodzi w wersję nocną
     public void setNightBlend(float b) {
         b = Math.max(0f, Math.min(1f, b));
@@ -230,23 +233,28 @@ public class DockView extends View {
         float rad = 22f * d;
 
         if (glass) {
-            // Liquid Glass: półprzezroczysty gradient z rozjaśnioną krawędzią
-            card.setStyle(Paint.Style.FILL);
-            card.setShader(new LinearGradient(l, t, rr, bt,
-                    new int[]{0x55FFFFFF, 0x15FFFFFF, 0x05FFFFFF, 0x25FFFFFF},
-                    new float[]{0f, 0.35f, 0.75f, 1f}, Shader.TileMode.CLAMP));
-            rect.set(l, t, rr, bt);
-            cv.drawRoundRect(rect, rad, rad, card);
-            card.setShader(null);
-            card.setStyle(Paint.Style.STROKE);
-            card.setStrokeWidth(1.2f * d);
-            card.setColor(0x55FFFFFF);
-            rect.set(l + d, t + d, rr - d, bt - d);
-            cv.drawRoundRect(rect, rad - d, rad - d, card);
-            if (bg != null) {
+            // Prawdziwy live blur tła + warstwa połysku Liquid Glass
+            if (glassBmp != null) {
+                LiveBlur.draw(cv, glassBmp, (int) l, (int) t, (int) rr, (int) bt, effNight());
+            } else if (bg != null) {
                 bg.setBounds((int) l, (int) t, (int) rr, (int) bt);
                 bg.draw(cv);
             }
+            Paint glassPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            glassPaint.setStyle(Paint.Style.FILL);
+            glassPaint.setShader(new LinearGradient(l, t, rr, bt,
+                    new int[]{0x44FFFFFF, 0x10FFFFFF, 0x04FFFFFF, 0x22FFFFFF},
+                    new float[]{0f, 0.25f, 0.7f, 1f}, Shader.TileMode.CLAMP));
+            rect.set(l, t, rr, bt);
+            cv.drawRoundRect(rect, rad, rad, glassPaint);
+            Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
+            edge.setStyle(Paint.Style.STROKE);
+            edge.setStrokeWidth(1.4f * d);
+            edge.setShader(new LinearGradient(l, t, rr, bt,
+                    new int[]{0xCCFFFFFF, 0x44FFFFFF, 0x14FFFFFF, 0x55FFFFFF},
+                    new float[]{0f, 0.3f, 0.75f, 1f}, Shader.TileMode.CLAMP));
+            rect.set(l + d * 0.7f, t + d * 0.7f, rr - d * 0.7f, bt - d * 0.7f);
+            cv.drawRoundRect(rect, rad - d * 0.7f, rad - d * 0.7f, edge);
         } else {
             // kolor docka w nocy: #131418; ramka jaśniejsza od lewego górnego rogu
             float nb = night ? 1f : blend;

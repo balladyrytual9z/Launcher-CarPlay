@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.content.Context;
@@ -68,14 +65,20 @@ public class HomeSections extends ViewGroup implements NightAware {
     protected void onLayout(boolean changed, int l, int t, int rr, int b) {
         float w = rr - l;
         float h = b - t;
+        // Inset for dock so content is not fully covered; content still can scroll under glass dock
+        float dockInset = Ui.dp(getContext(), Ui.DOCK_OFFSET_DP) * 0.15f; // small visual margin only
+        boolean dockLeft = Ui.dockLeft(getContext());
+        float padL = 12f * d + (dockLeft ? dockInset : 0);
+        float padR = 12f * d + (dockLeft ? 0 : dockInset);
         float pad = 12f * d;
         float gap = 10f * d;
-        float leftW = (w - 2 * pad - gap) * 0.60f;
-        float rx = pad + leftW + gap;
+        float usableW = w - padL - padR - gap;
+        float leftW = usableW * 0.60f;
+        float rx = padL + leftW + gap;
         float topH = (h - 2 * pad - gap) / 3f;
-        place(left, pad, pad, pad + leftW, h - pad);
-        place(rightTop, rx, pad, w - pad, pad + topH);
-        place(rightBottom, rx, pad + topH + gap, w - pad, h - pad);
+        place(left, padL, pad, padL + leftW, h - pad);
+        place(rightTop, rx, pad, w - padR, pad + topH);
+        place(rightBottom, rx, pad + topH + gap, w - padR, h - pad);
     }
 
     // pusty slot (miejsce na widżet) w stylu kart CarPlay

@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.app.Activity;
@@ -16,13 +13,6 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.view.Window;
-import android.view.WindowManager;
-import android.widget.FrameLayout;
-import android.os.Handler;
-import android.os.Looper;
-import java.util.Calendar;
-import java.util.Locale;
 import android.net.Uri;
 import android.provider.Settings;
 import android.os.Bundle;
@@ -75,17 +65,23 @@ public class ConfigActivity extends BaseActivity {
         night = Look.night(this);
         setTheme(night ? R.style.Dock_Night : R.style.Dock_Day);
         super.onCreate(b);
+        // Allow system navigation bar / home gesture so user can pull the system bar
+        try {
+            getWindow().getDecorView().setSystemUiVisibility(
+                    android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                            | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+            getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        } catch (Throwable ignored) {}
         Ui.dockWindow(getWindow(), this);
+        // Ensure the activity window does not swallow system gestures
+        try {
+            getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
+            getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
+            // Keep NOT_TOUCH_MODAL so touches outside (dock area) can pass, but allow system UI
+        } catch (Throwable ignored) {}
         p = Look.pal(night);
         StatusService.start(this);
-        Intent st = getIntent();
-        if (st != null && st.hasExtra("keep_section")) {
-            String s = st.getStringExtra("keep_section");
-            if (s != null && s.length() > 0) openSection = s;
-        }
-        ControlCenterGestureService.start(this);
         build();
-        applyImmersive();
     }
 
     // ---------- pomocnicze ----------
@@ -234,20 +230,9 @@ public class ConfigActivity extends BaseActivity {
         title.setPadding(dp(8), dp(4), 0, 0);
         col.addView(title);
 
-        // --- Wygląd --- (promień zaokrąglenia)
+        // --- Wygląd ---
         section(col, "Wygląd");
         LinearLayout g = group(col);
-        g.addView(segRow("Promień zaokrąglenia", new String[]{"0", "13", "26", "38"},
-                Prefs.cornerRadius(this) >= 32 ? 3 : (Prefs.cornerRadius(this) >= 20 ? 2
-                        : (Prefs.cornerRadius(this) >= 10 ? 1 : 0)), new OnSel() {
-            @Override
-            public void on(int i) {
-                Prefs.setCornerRadius(ConfigActivity.this, i == 0 ? 0 : (i == 1 ? 13 : (i == 2 ? 26 : 38)));
-                NightShift.restore(ConfigActivity.this);
-                themeChanged();
-            }
-        }));
-        sep(g);
         g.addView(segRow("Styl", new String[]{"Klasyczny", "Liquid Glass"},
                 "glass".equals(Prefs.style(this)) ? 1 : 0, new OnSel() {
                     @Override
@@ -309,8 +294,8 @@ public class ConfigActivity extends BaseActivity {
             }
         }
 
-        // --- Aplikacje w docku ---
-        section(col, "Aplikacje w docku");
+        // --- Górne aplikacje ---
+        section(col, "Górne aplikacje");
         g = group(col);
         g.addView(segRow("Które pokazywać", new String[]{"Ostatnio używane", "Najczęściej używane"},
                 "count".equals(Prefs.sortMode(this)) ? 1 : 0, new OnSel() {
@@ -529,25 +514,6 @@ public class ConfigActivity extends BaseActivity {
                 }));
         footer(col, "„Przełącz / aplikacja”: Dock próbuje przełączyć Bluetooth, a gdy radio "
                 + "tego nie przyjmie, otwiera jego aplikację.");
-        g = group(col);
-        g.addView(switchRow("Centrum Łączności nad innymi aplikacjami (gest od dołu)",
-                Prefs.ccSwipe(this), new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton b, boolean v) {
-                if (v && !Settings.canDrawOverlays(ConfigActivity.this)) {
-                    Toast.makeText(ConfigActivity.this,
-                            "Zezwól na wyświetlanie nad innymi aplikacjami",
-                            Toast.LENGTH_LONG).show();
-                    startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:" + getPackageName())));
-                    b.setChecked(false);
-                    return;
-                }
-                Prefs.setCcSwipe(ConfigActivity.this, v);
-            }
-        }));
-        footer(col, "Gest w górę od dolnej krawędzi ekranu otwiera Centrum Łączności "
-                + "także nad innymi aplikacjami.");
 
         // --- Status CarPlay (DiPlay) ---
         section(col, "Status CarPlay");
@@ -709,8 +675,7 @@ public class ConfigActivity extends BaseActivity {
 
         extraSections(col);
         finishLayout(col, title, sv);
-        contentSv = sv;
-        installWithDock();
+        setContentView(sv);
     }
 
     // ---------- hierarchia: lista kategorii -> ekran kategorii ----------
@@ -739,34 +704,6 @@ public class ConfigActivity extends BaseActivity {
             TextView hint = text("Wszystkie ustawienia Docka i launchera w jednym miejscu.", 14, p.sub, false);
             hint.setPadding(dp(8), dp(2), dp(8), dp(12));
             col.addView(hint);
-            LinearLayout qg = group(col);
-            // skróty na górze
-            sep(qg);
-            qg.addView(quickRow(R.drawable.ic_wifi, "Wi-Fi", "Ustawienia sieci Wi-Fi", new Runnable() {
-                @Override public void run() { Net.openWifiSettings(ConfigActivity.this); }
-            }));
-            sep(qg);
-            qg.addView(quickRow(R.drawable.ic_bt, "Bluetooth", "Sparowane urządzenia", new Runnable() {
-                @Override public void run() { Net.openBluetoothSettings(ConfigActivity.this); }
-            }));
-            sep(qg);
-            qg.addView(quickRow(R.drawable.ic_tether, "Hotspot Wi-Fi", "Udostępnianie internetu", new Runnable() {
-                @Override public void run() { Net.openTetherSettings(ConfigActivity.this); }
-            }));
-            sep(qg);
-            qg.addView(quickRow(0, "Ustawienia samochodu", "Fabryczne ustawienia HU", new Runnable() {
-                @Override public void run() { openPkg("com.hcn.autosetting"); }
-            }));
-            sep(qg);
-            qg.addView(quickRow(0, "Ustawienia DiPlay", "Aplikacja CarPlay DiPlay", new Runnable() {
-                @Override public void run() { openPkg(Prefs.diplayPkg(ConfigActivity.this)); }
-            }));
-            sep(qg);
-            qg.addView(quickRow(0, "Ustawienia Androida", "Systemowe ustawienia", new Runnable() {
-                @Override public void run() {
-                    startActivity(new Intent(Settings.ACTION_SETTINGS));
-                }
-            }));
             LinearLayout g = group(col);
             for (int i = 0; i < names.size(); i++) {
                 final String n = names.get(i);
@@ -902,6 +839,42 @@ public class ConfigActivity extends BaseActivity {
                 }));
         footer(col, "Każda tapeta ma wersję jasną i ciemną; przełączają się razem z trybem wyglądu.");
 
+        section(col, "Circadian Display");
+        g = group(col);
+        if (pl.dock.widget.circadian.CircadianBridge.isInstalled(this)) {
+            g.addView(toggle("Automatycznie aktywuj profil Circadian przy trybie nocnym",
+                    Prefs.circadianAuto(this), new BoolSetter() {
+                @Override
+                public void set(boolean v) {
+                    Prefs.setCircadianAuto(ConfigActivity.this, v);
+                    if (v) {
+                        pl.dock.widget.circadian.CircadianBridge.setNightMode(
+                                ConfigActivity.this, Look.night(ConfigActivity.this));
+                    }
+                }
+            }));
+            sep(g);
+            g.addView(row(null, "Otwórz Circadian Display", "", true, p.accent, new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    android.content.Intent i = pl.dock.widget.circadian.CircadianBridge.openApp(ConfigActivity.this);
+                    if (i != null) startActivity(i);
+                }
+            }));
+        } else {
+            g.addView(row(null, "Zainstaluj Circadian Display", "Brak", true, p.accent, new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW,
+                                android.net.Uri.parse("https://f-droid.org/packages/com.circadiandisplay.app/")));
+                    } catch (Throwable ignored) {}
+                }
+            }));
+        }
+        footer(col, "Circadian Display ustawia ciepło i przygaszenie ekranu wg krzywej. "
+                + "Dock aktywuje wybrany profil przy przejściu w tryb nocny.");
+
         section(col, "Kopia zapasowa");
         g = group(col);
         g.addView(row(null, "Eksportuj ustawienia do pliku", "", true, p.accent, new View.OnClickListener() {
@@ -924,7 +897,8 @@ public class ConfigActivity extends BaseActivity {
                 startActivityForResult(i, REQ_BACKUP_IMPORT);
             }
         }));
-        footer(col, "Kopia obejmuje listę aplikacji, widżety, tapetę, wygląd i wszystkie ustawienia Docka.");
+        footer(col, "Kopia obejmuje listę aplikacji, widżety, tapetę, wygląd i wszystkie ustawienia Docka. "
+                + "Nie obejmuje pełnych danych Circadian Display — te mają własny eksport.");
 
         section(col, "Telefon");
         g = group(col);
@@ -1071,14 +1045,7 @@ public class ConfigActivity extends BaseActivity {
 
     private void themeChanged() {
         DockWidget.updateAll(this);
-        // płynny restart bez animacji systemowych, z zachowaniem aktualnej sekcji
-        Intent i = new Intent(this, ConfigActivity.class);
-        i.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
-        if (openSection != null) i.putExtra("keep_section", openSection);
-        startActivity(i);
-        overridePendingTransition(0, 0);
-        finish();
-        overridePendingTransition(0, 0);
+        recreate();
     }
 
     private String iconModeName(AppEntry e) {
@@ -1521,152 +1488,6 @@ public class ConfigActivity extends BaseActivity {
         t.setPadding(dp(18), dp(14), dp(18), dp(14));
         t.setText(MediaHub.describe(this));
         Popups.panel(this, t, 600, Gravity.CENTER).show();
-    }
-
-    // ---------- skróty na górze ----------
-    private LinearLayout quickRow(int iconRes, String title, String sub, final Runnable action) {
-        LinearLayout l = new LinearLayout(this);
-        l.setGravity(Gravity.CENTER_VERTICAL);
-        l.setOrientation(LinearLayout.HORIZONTAL);
-        l.setMinimumHeight(dp(56));
-        l.setPadding(dp(16), dp(10), dp(16), dp(10));
-        if (iconRes != 0) {
-            ImageView iv = new ImageView(this);
-            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(28), dp(28));
-            ip.rightMargin = dp(14);
-            iv.setLayoutParams(ip);
-            iv.setImageBitmap(Icons.vector(this, iconRes, dp(28), p.text));
-            l.addView(iv);
-        }
-        LinearLayout txt = new LinearLayout(this);
-        txt.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        txt.setLayoutParams(tp);
-        txt.addView(text(title, 17, p.text, true));
-        if (sub != null && sub.length() > 0) txt.addView(text(sub, 13, p.sub, false));
-        l.addView(txt);
-        TextView arr = text("›", 24, p.sub, false);
-        arr.setPadding(dp(4), 0, 0, 0);
-        l.addView(arr);
-        l.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (action != null) action.run();
-            }
-        });
-        return l;
-    }
-
-    // ---------- dock widoczny obok ustawień ----------
-    private ScrollView contentSv;
-    private DockView cfgDock;
-    private final Handler dockH = new Handler(Looper.getMainLooper());
-    private Runnable dockTick;
-    private String cfgDockSig = "";
-
-    private void installWithDock() {
-        if (contentSv == null) return;
-        if (dockTick != null) dockH.removeCallbacks(dockTick);
-        ViewGroup parent = (ViewGroup) contentSv.getParent();
-        if (parent != null) parent.removeView(contentSv);
-        boolean left = Ui.dockLeft(this);
-        int dockPx = dp(Ui.DOCK_OFFSET_DP);
-        FrameLayout root = new FrameLayout(this);
-        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        if (left) clp.leftMargin = dockPx; else clp.rightMargin = dockPx;
-        root.addView(contentSv, clp);
-        cfgDock = new DockView(this);
-        root.addView(cfgDock, new FrameLayout.LayoutParams(dockPx,
-                ViewGroup.LayoutParams.MATCH_PARENT, left ? Gravity.START : Gravity.END));
-        cfgDock.setListener(new DockView.Listener() {
-            @Override public void onHeader() {
-                startActivity(new Intent(ConfigActivity.this, ConnectivityActivity.class));
-            }
-            @Override public void onApp(int index) {
-                if (index < 3) {
-                    List<AppEntry> top = Prefs.top(ConfigActivity.this, 3);
-                    if (index < top.size()) {
-                        Intent i = getPackageManager().getLaunchIntentForPackage(top.get(index).pkg);
-                        if (i != null) {
-                            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            startActivity(i);
-                        }
-                    }
-                } else {
-                    Launch.carplay(ConfigActivity.this);
-                }
-            }
-            @Override public void onBottom() {
-                finish();
-            }
-            @Override public void onBottomLong() {
-                RecentAppsPopup.show(ConfigActivity.this, Prefs.recents(ConfigActivity.this, 8));
-            }
-        });
-        setContentView(root);
-        // okno ustawień na całą szerokość – z własnym dockiem po boku
-        Window w = getWindow();
-        w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        w.setGravity(Gravity.TOP | Gravity.LEFT);
-        w.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
-        refreshCfgDock();
-        if (dockTick == null) {
-            dockTick = new Runnable() {
-                @Override
-                public void run() {
-                    refreshCfgDock();
-                    dockH.postDelayed(this, 60000);
-                }
-            };
-        }
-        dockH.postDelayed(dockTick, 60000);
-    }
-
-    private void refreshCfgDock() {
-        if (cfgDock == null) return;
-        Calendar cal = Calendar.getInstance();
-        String clock = String.format(Locale.US, "%02d:%02d",
-                cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE));
-        StatusCenter.Snap s = StatusCenter.get(this);
-        String sig = clock + "|" + s.sig() + "|" + night + "|" + Prefs.style(this);
-        if (sig.equals(cfgDockSig)) return;
-        cfgDockSig = sig;
-        List<AppEntry> top = Prefs.top(this, 3);
-        AppEntry cp = Prefs.carplay(this);
-        Bitmap[] ic = new Bitmap[4];
-        for (int i = 0; i < 3 && i < top.size(); i++) ic[i] = Icons.forEntry(this, top.get(i));
-        ic[3] = Icons.forEntry(this, cp);
-        cfgDock.setData(night, "glass".equals(Prefs.style(this)), clock, s, Prefs.showVoltage(this), ic);
-        cfgDock.setCarplayState(s.cp);
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        dockH.removeCallbacks(dockTick);
-    }
-
-    private void applyImmersive() {
-        try {
-            int flags = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_FULLSCREEN;
-            if (!night) {
-                flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-            }
-            getWindow().getDecorView().setSystemUiVisibility(flags);
-        } catch (Throwable ignored) {}
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) applyImmersive();
     }
 }
 
