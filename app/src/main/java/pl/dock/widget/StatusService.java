@@ -1,4 +1,3 @@
-
 package pl.dock.widget;
 
 import android.app.Notification;
@@ -28,6 +27,8 @@ public class StatusService extends Service {
     private long lastBattery = 0;
     private Handler handler;
     private Runnable tick;
+    private BroadcastReceiver modeReceiver;
+    private Runnable nightScheduler;
 
     public static void start(Context c) {
         try {
@@ -145,6 +146,92 @@ public class StatusService extends Service {
                 DockWidget.updateAll(StatusService.this);
             }
         });
+
+        // Dwukierunkowa pętla z Circadian Display:
+        //  • pl.circadiandisplay.STATE_CHANGED  ← nakładka zgłasza zmianę isNight
+        //  • pl.dock.widget.NIGHT_MODE_CHANGED  → Dock informuje nakładkę / siebie
+        modeReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context ctx, Intent intent) {
+                String a = intent.getAction();
+                if (a == null) return;
+                if (pl.dock.widget.circadian.CircadianBridge.ACTION_STATE_CHANGED.equals(a)) {
+                    // Stan z aplikacji Circadian Display (Night Shift) – natychmiastowa synchronizacja UI
+                    boolean isNight = intent.getBooleanExtra("isNight", false);
+                    applyCircadianState(ctx, isNight);
+                    return;
+                }
+                if (pl.dock.widget.circadian.CircadianBridge.ACTION_NIGHT.equals(a)
+                        || "pl.dock.widget.NIGHT_MODE_CHANGED".equals(a)) {
+                    boolean isNight = intent.getBooleanExtra("isNight", false);
+                    // Wewnętrzny / wychodzący sygnał: aktywuj profil nocny Circadian gdy trzeba
+                    if (isNight && Prefs.circadianAuto(ctx)
+                            && pl.dock.widget.circadian.CircadianBridge.isInstalled(ctx)) {
+                        pl.dock.widget.circadian.CircadianBridge.activateForNight(ctx);
+                    }
+                }
+            }
+        };
+        IntentFilter modeFilter = new IntentFilter();
+        modeFilter.addAction(pl.dock.widget.circadian.CircadianBridge.ACTION_NIGHT);
+        modeFilter.addAction(pl.dock.widget.circadian.CircadianBridge.ACTION_STATE_CHANGED);
+        modeFilter.addAction("pl.dock.widget.NIGHT_MODE_CHANGED");
+        registerReceiver(modeReceiver, modeFilter);
+
+        nightScheduler = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Boolean was = Look.wasNight;
+                    boolean nowNight = Look.night(StatusService.this);
+                    if (was == null || was.booleanValue() != nowNight) {
+                        if (Prefs.circadianAuto(StatusService.this)
+                                && pl.dock.widget.circadian.CircadianBridge.isInstalled(StatusService.this)) {
+                            pl.dock.widget.circadian.CircadianBridge.setNightMode(
+                                    StatusService.this, nowNight);
+                        }
+                        sendBroadcast(new Intent(pl.dock.widget.circadian.CircadianBridge.ACTION_NIGHT)
+                                .setPackage(getPackageName())
+                                .putExtra("isNight", nowNight));
+                    }
+                } catch (Throwable ignored) {
+                }
+                if (handler != null) handler.postDelayed(this, 30000L);
+            }
+        };
+        handler.postDelayed(nightScheduler, 30000L);
+    }
+
+    /**
+     * Synchronizacja trybu dzienny/nocny z Circadian Display.
+     * Aktualizuje Prefs, odświeża widżet i emituje wewnętrzny NIGHT_MODE_CHANGED
+     * (LauncherActivity nasłuchuje i od razu przebudowuje tapetę / ikony).
+     */
+    private void applyCircadianState(Context ctx, boolean isNight) {
+        try {
+            if (!Prefs.circadianAuto(ctx)) return;
+            String want = isNight ? "night" : "day";
+            // Nie nadpisuj trybu godzinowego – tylko day/night oraz followSystem
+            if (Prefs.followSystem(ctx)) {
+                // tryb systemowy: nie ruszamy Prefs.mode, ale i tak odświeżamy UI
+            } else if (!"time".equals(Prefs.mode(ctx))) {
+                if (!want.equals(Prefs.mode(ctx))) {
+                    Prefs.setMode(ctx, want);
+                }
+            } else {
+                // tryb "time": ustaw ręczny day/night, by natychmiast odzwierciedlić wybór użytkownika
+                Prefs.setMode(ctx, want);
+            }
+            Look.wasNight = isNight;
+            StatusCenter.refresh(ctx);
+            DockWidget.updateAll(ctx);
+            // Powiadom launcher (ten sam proces) – bez setPackage do Circadian, żeby nie zapętlić
+            sendBroadcast(new Intent(pl.dock.widget.circadian.CircadianBridge.ACTION_NIGHT)
+                    .setPackage(getPackageName())
+                    .putExtra("isNight", isNight)
+                    .putExtra("from_circadian", true));
+        } catch (Throwable ignored) {
+        }
     }
 
     private void goForeground() {
@@ -173,8 +260,10 @@ public class StatusService extends Service {
     public void onDestroy() {
         try {
             if (handler != null && tick != null) handler.removeCallbacks(tick);
+            if (handler != null && nightScheduler != null) handler.removeCallbacks(nightScheduler);
             unregisterReceiver(receiver);
             if (bcastReceiver != null) unregisterReceiver(bcastReceiver);
+            if (modeReceiver != null) unregisterReceiver(modeReceiver);
         } catch (Exception ignored) {
         }
         super.onDestroy();

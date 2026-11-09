@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.content.Context;
@@ -56,22 +53,23 @@ public class Ui {
         return g;
     }
 
-    // tło ekranu ustawień (zaokrąglone od strony docka)
+    // tło ekranu ustawień – Apple-like soft wallpaper gradient with glass feel
     public static GradientDrawable pageBg(Context c, boolean night) {
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                night ? new int[]{0xFF161617, 0xFF000000} : new int[]{0xFFF2F2F7, 0xFFE2E2E8});
+                night ? new int[]{0xFF0B0B12, 0xFF1A1A2E, 0xFF12121A, 0xFF000000}
+                      : new int[]{0xFFE8EEF8, 0xFFF5F7FB, 0xFFE2E8F0, 0xFFDDE4F0});
         float r = dp(c, 26);
         g.setCornerRadii(dockLeft(c) ? new float[]{r, r, 0, 0, 0, 0, r, r}
                 : new float[]{0, 0, r, r, r, r, 0, 0});
         return g;
     }
 
-    // karta z listą (jak w ustawieniach CarPlay)
+    // karta z listą (jak w ustawieniach CarPlay / Apple)
     public static GradientDrawable cardBg(Context c, boolean night) {
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                night ? new int[]{0xFF232325, 0xFF2F2F32, 0xFF232325}
-                        : new int[]{0xFFFFFFFF, 0xFFFFFFFF});
-        g.setCornerRadius(dp(c, 24));
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                night ? new int[]{0xE0282830, 0xE01E1E24}
+                        : new int[]{0xF0FFFFFF, 0xF0F7F8FC});
+        g.setCornerRadius(dp(c, 16));
         return g;
     }
 
@@ -84,21 +82,12 @@ public class Ui {
         return g;
     }
 
-    // karta: polprzezroczyste tlo (jak iOS 18 widgets) + delikatny gradient u gory
+    // karta w kolorze docka (noc: #131418) z ramką jaśniejszą od lewego górnego rogu
     public static void ringCard(Canvas cv, RectF r, float radius, float stroke, boolean night,
                                 boolean ring) {
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        // noc: ~70% czerni, dzien: ~75% bieli
-        p.setColor(night ? 0xB3101012 : 0xBFFFFFFF);
+        p.setColor(night ? 0xFF131418 : 0xFFF2F2F5);
         cv.drawRoundRect(r, radius, radius, p);
-
-        // delikatny gradient u gory (efekt "szkla")
-        p.setShader(new LinearGradient(r.left, r.top, r.left, r.top + r.height() * 0.45f,
-                new int[]{0x40FFFFFF, 0x00FFFFFF},
-                new float[]{0f, 1f}, Shader.TileMode.CLAMP));
-        cv.drawRoundRect(r, radius, radius, p);
-        p.setShader(null);
-
         if (!ring) return;
         p.setStyle(Paint.Style.STROKE);
         p.setStrokeWidth(stroke);
@@ -109,7 +98,6 @@ public class Ui {
         RectF in = new RectF(r.left + stroke / 2, r.top + stroke / 2, r.right - stroke / 2,
                 r.bottom - stroke / 2);
         cv.drawRoundRect(in, radius - stroke / 2, radius - stroke / 2, p);
-        p.setShader(null);
     }
 
     // ------------------------------------------------------------ strzałka / znacznik

@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.content.Context;
@@ -373,29 +370,6 @@ public class Prefs {
 
     public static void setShowVoltage(Context c, boolean v) {
         ed(c).putBoolean("voltage", v).apply();
-    }
-
-    // promień zaokrąglenia kart / paneli (dp): 0 / 13 / 26 / 38
-    public static int cornerRadius(Context c) {
-        return sp(c).getInt("corner_radius", 26);
-    }
-
-    public static void setCornerRadius(Context c, int v) {
-        ed(c).putInt("corner_radius", v).apply();
-    }
-
-    // Centrum Łączności nad innymi aplikacjami (gest od dołu ekranu)
-    public static boolean ccSwipe(Context c) {
-        return sp(c).getBoolean("ccswipe", true);
-    }
-
-    public static void setCcSwipe(Context c, boolean v) {
-        ed(c).putBoolean("ccswipe", v).apply();
-        try {
-            if (v) pl.dock.widget.ControlCenterGestureService.start(c);
-            else pl.dock.widget.ControlCenterGestureService.stop(c);
-        } catch (Throwable ignored) {
-        }
     }
 
     // ---------- przycisk siatki (tylko widżet) ----------
@@ -802,26 +776,6 @@ public class Prefs {
         return sel.contains(pkg);
     }
 
-    // ukrywa aplikację z siatki: buduje jawną listę widocznych bez tego pakietu
-    public static void hideFromGrid(Context c, String pkg) {
-        List<String> sel = selectedPkgs(c);
-        if (sel.isEmpty()) {
-            sel = new ArrayList<String>();
-            android.content.pm.PackageManager pm = c.getPackageManager();
-            android.content.Intent main = new android.content.Intent(android.content.Intent.ACTION_MAIN);
-            main.addCategory(android.content.Intent.CATEGORY_LAUNCHER);
-            for (android.content.pm.ResolveInfo ri : pm.queryIntentActivities(main, 0)) {
-                String p = ri.activityInfo.packageName;
-                if (!p.equals(c.getPackageName()) && !p.equals(pkg) && !sel.contains(p)) sel.add(p);
-            }
-        } else {
-            List<String> out = new ArrayList<String>();
-            for (String p : sel) if (!p.equals(pkg)) out.add(p);
-            sel = out;
-        }
-        setSelectedPkgs(c, sel);
-    }
-
     // ---------- OSTATNIA STRONA ----------
     public static final String PAGE_WIDGETS = "widgets";
     public static final String PAGE_HOME = "home";
@@ -865,6 +819,14 @@ public class Prefs {
         JSONArray a = new JSONArray();
         for (String p : pkgs) a.put(p);
         ed(c).putString("trusted", a.toString()).apply();
+    }
+
+    public static boolean circadianAuto(Context c) {
+        return sp(c).getBoolean("circadian_auto", true);
+    }
+
+    public static void setCircadianAuto(Context c, boolean v) {
+        ed(c).putBoolean("circadian_auto", v).apply();
     }
 
     public static String dspPkg(Context c) {

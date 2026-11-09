@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.app.Activity;
@@ -38,24 +35,6 @@ public class Popups {
         return t;
     }
 
-    // zrzut ekranu aktywności rozmyty – tło panelu "ze szkła"
-    public static android.graphics.Bitmap glassSnap(Activity a) {
-        try {
-            android.view.View dec = a.getWindow().getDecorView();
-            int k = 6;
-            android.graphics.Bitmap b = android.graphics.Bitmap.createBitmap(
-                    Math.max(1, dec.getWidth() / k), Math.max(1, dec.getHeight() / k),
-                    android.graphics.Bitmap.Config.ARGB_8888);
-            android.graphics.Canvas cv = new android.graphics.Canvas(b);
-            cv.scale(1f / k, 1f / k);
-            dec.draw(cv);
-            Blur.blur(b, 3, 3);
-            return b;
-        } catch (Throwable t) {
-            return null;
-        }
-    }
-
     public static Dialog panel(Activity a, View content, int widthDp, int gravity) {
         boolean night = Look.night(a);
         final Dialog d = new Dialog(a, android.R.style.Theme_Translucent_NoTitleBar);
@@ -70,18 +49,6 @@ public class Popups {
         });
         LinearLayout panel = new LinearLayout(a);
         panel.setOrientation(LinearLayout.VERTICAL);
-        android.graphics.Bitmap glass = glassSnap(a);
-        if (glass != null) {
-            android.widget.ImageView iv = new android.widget.ImageView(a);
-            iv.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
-            iv.setImageBitmap(glass);
-            panel.addView(iv, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-            View tint = new View(a);
-            tint.setBackgroundColor(night ? 0x40000000 : 0x30FFFFFF);
-            panel.addView(tint, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        }
         panel.setBackground(Ui.popupBg(a, night));
         panel.setClickable(true);
         panel.setElevation(Ui.dp(a, 12));
