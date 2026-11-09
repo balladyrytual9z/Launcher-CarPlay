@@ -1,4 +1,3 @@
-
 package pl.dock.widget;
 
 import java.util.Locale;

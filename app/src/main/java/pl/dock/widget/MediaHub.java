@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.content.BroadcastReceiver;
@@ -102,7 +99,7 @@ public class MediaHub {
         @Override
         public void onSessionDestroyed() {
             ctl = null;
-            // Zmiana: podtrzymujemy dane o utworze i okładce,
+            // Zmiana: Podtrzymujemy dane o utworze i okładce,
             // jedynie oznaczamy brak sesji i zatrzymujemy status odtwarzania.
             if (track != null) {
                 track.state = PlaybackState.STATE_NONE;
@@ -276,8 +273,8 @@ public class MediaHub {
             if (ctl != null) ctl.registerCallback(ctlCallback, main);
         }
         if (ctl == null) {
-            // Zmiana: kontroler zniknął (np. po wybudzeniu tabletu) –
-            // podtrzymujemy ostatnio znane metadane i okładkę.
+            // Zmiana: Jeśli kontroler zniknął (np. po wybudzeniu tabletu, przed pełnym
+            // połączeniem CarPlay), podtrzymujemy ostatnio znane metadane i okładkę.
             if (track != null) {
                 track.state = PlaybackState.STATE_NONE;
                 track.hasSession = false;
@@ -319,20 +316,23 @@ public class MediaHub {
             t.art = shrink(a);
         }
 
-        // --- Wake-up fix: podtrzymywanie danych z poprzedniej sesji ---
+        // --- NOWY KOD: Podtrzymywanie danych z poprzedniej sesji (Wake-up fix) ---
         if (track != null && track.hasData()) {
-            // puste metadane nowej sesji -> przywracamy zapisany tytuł/wykonawcę/album
+            // Jeśli nowa sesja po wybudzeniu zaraportowała puste metadane,
+            // przywracamy zapisany tytuł, wykonawcę i album.
             if (t.title.length() == 0) {
                 t.title = track.title;
                 t.artist = track.artist;
                 t.album = track.album;
                 t.duration = track.duration;
             }
-            // okładka jeszcze nie wypchnięta -> wstrzykujemy zapamiętaną
+            // Jeśli tytuł jest zgodny, ale aplikacja w tle jeszcze nie wypchnęła
+            // nowej okładki (t.art == null), wstrzykujemy okładkę zachowaną w pamięci.
             if (t.art == null && t.title.equals(track.title) && track.art != null) {
                 t.art = track.art;
             }
         }
+        // --- KONIEC NOWEGO KODU ---
 
         PlaybackState ps = c.getPlaybackState();
         if (ps != null) {

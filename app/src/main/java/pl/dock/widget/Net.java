@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.bluetooth.BluetoothAdapter;
@@ -188,31 +185,46 @@ public class Net {
     }
 
     public static boolean openTetherSettings(Context c) {
-        // najpierw wprost ekran "Hotspot Wi-Fi", potem ogólny "Hotspot i tethering"
-        try {
-            Intent direct = new Intent();
-            direct.setClassName("com.android.settings", "com.android.settings.SubSettings");
-            direct.putExtra(":settings:show_fragment", "com.android.settings.wifi.tether.WifiTetherSettings");
-            direct.putExtra(":settings:show_fragment_title_resid", 0);
-            direct.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            c.startActivity(direct);
-            return true;
-        } catch (Throwable ignored) {
-        }
-        Intent[] tries = {
-                new Intent().setClassName("com.android.settings", "com.android.settings.TetherSettings"),
-                new Intent("android.settings.TETHER_SETTINGS"),
-                new Intent(Settings.ACTION_WIRELESS_SETTINGS),
-                new Intent(Settings.ACTION_SETTINGS)
+        // Priorytet 1: precyzyjny ekran Hotspot Wi-Fi (AOSP + MediaTek)
+        String[][] direct = {
+            {"com.android.settings", "com.android.settings.Settings$WifiApSettingsActivity"},
+            {"com.android.settings", "com.android.settings.wifi.tether.WifiTetherSettings"},
+            {"com.android.settings", "com.android.settings.TetherSettings"},
+            {"com.mediatek.settings", "com.mediatek.settings.TetherSettings"},
         };
-        for (Intent i : tries) {
+        for (String[] pair : direct) {
+            try {
+                Intent i = new Intent();
+                i.setClassName(pair[0], pair[1]);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                if (i.resolveActivity(c.getPackageManager()) != null) {
+                    c.startActivity(i);
+                    return true;
+                }
+            } catch (Throwable ignored) {}
+        }
+        // Priorytet 2: ukryty fragment settings
+        try {
+            Intent i = new Intent();
+            i.setClassName("com.android.settings", "com.android.settings.SubSettings");
+            i.putExtra(":settings:show_fragment",
+                    "com.android.settings.wifi.tether.WifiTetherSettings");
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            c.startActivity(i);
+            return true;
+        } catch (Throwable ignored) {}
+        // Fallback: ACTION_TETHER_SETTINGS
+        Intent[] fallbacks = {
+            new Intent("android.settings.TETHER_SETTINGS"),
+            new Intent(Settings.ACTION_WIRELESS_SETTINGS),
+        };
+        for (Intent i : fallbacks) {
             try {
                 if (i.resolveActivity(c.getPackageManager()) == null) continue;
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 c.startActivity(i);
                 return true;
-            } catch (Throwable ignored) {
-            }
+            } catch (Throwable ignored) {}
         }
         return false;
     }
@@ -229,19 +241,14 @@ public class Net {
 
     // aplikacja Bluetooth radia (pakiet z ustawień); gdy jej nie ma – ustawienia systemowe
     public static boolean openBluetoothApp(Context c) {
-        // kolejne próby: pakiet z ustawień → typowe OEM → ustawienia Bluetooth
-        String[] tries = {Prefs.btPkg(c), "com.syu.bt", "com.ts.bt", "com.ts.MainUI"};
-        for (String pkg : tries) {
-            try {
-                Intent i = pkg == null || pkg.length() == 0 ? null
-                        : c.getPackageManager().getLaunchIntentForPackage(pkg);
-                if (i != null) {
-                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    c.startActivity(i);
-                    return true;
-                }
-            } catch (Throwable ignored) {
+        try {
+            Intent i = c.getPackageManager().getLaunchIntentForPackage(Prefs.btPkg(c));
+            if (i != null) {
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                c.startActivity(i);
+                return true;
             }
+        } catch (Throwable ignored) {
         }
         return openBluetoothSettings(c);
     }

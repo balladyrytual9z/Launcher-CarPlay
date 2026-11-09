@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.animation.Animator;

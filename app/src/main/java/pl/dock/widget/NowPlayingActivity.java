@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.app.Activity;
@@ -50,7 +47,6 @@ public class NowPlayingActivity extends BaseActivity implements MediaHub.Listene
         setTheme(android.R.style.Theme_Translucent_NoTitleBar);
         super.onCreate(b);
         Ui.dockWindow(getWindow(), this);
-        applyImmersive();
         root = new FrameLayout(this);
         root.setBackground(Ui.pageBg(this, night));
         pv = new PlayerView(this);
@@ -447,27 +443,6 @@ public class NowPlayingActivity extends BaseActivity implements MediaHub.Listene
                 MediaHub.get().sendCustom(a);
             }
         }
-    }
-
-    private void applyImmersive() {
-        try {
-            int flags = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_FULLSCREEN;
-            if (!night) {
-                flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-            }
-            getWindow().getDecorView().setSystemUiVisibility(flags);
-        } catch (Throwable ignored) {}
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) applyImmersive();
     }
 }
 

@@ -1,4 +1,3 @@
-
 package pl.dock.widget;
 
 import android.animation.Animator;
@@ -31,7 +30,6 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
@@ -55,7 +53,6 @@ public class LauncherActivity extends BaseActivity {
     private static final int HOST_ID = 4217;
     private static final int REQ_BIND = 31;
     private static final int REQ_CONFIG = 32;
-    private static final int REQ_UNINSTALL = 1001;
 
     private FrameLayout root;
     private BackgroundView bg;
@@ -125,6 +122,7 @@ public class LauncherActivity extends BaseActivity {
 
     private BroadcastReceiver statusReceiver;
     private BroadcastReceiver pkgReceiver;
+    private BroadcastReceiver nightModeReceiver;
     private final MediaHub.Listener mediaListener = new MediaHub.Listener() {
         @Override
         public void onTrack(MediaHub.Track t) {
@@ -171,7 +169,6 @@ public class LauncherActivity extends BaseActivity {
     protected void onStart() {
         super.onStart();
         visible = true;
-        ControlCenterGestureService.start(this);
         try {
             host.startListening();
         } catch (Throwable ignored) {
@@ -335,8 +332,7 @@ public class LauncherActivity extends BaseActivity {
         root.setOutlineProvider(new ViewOutlineProvider() {
             @Override
             public void getOutline(View v, Outline o) {
-                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(),
-                        Ui.dp(LauncherActivity.this, Math.max(0, Prefs.cornerRadius(LauncherActivity.this))));
+                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Ui.dp(LauncherActivity.this, 26));
             }
         });
         getWindow().setBackgroundDrawable("system".equals(Prefs.wallpaper(this))
@@ -346,12 +342,14 @@ public class LauncherActivity extends BaseActivity {
         root.addView(bg, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
+        // Pager occupies full width; dock overlays it (liquid glass draws content underneath)
         pager = new PagerView(this);
         pager.setReduceMotion(Prefs.reduceMotion(this));
-        // treść na całą szerokość – częściowo pod dockiem jak w CarPlay
-        root.addView(pager, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT));
+        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        root.addView(pager, plp);
 
+        // Page indicators keep side margin so they don't sit under the dock
         dotsTop = new PageDots(this, true);
         dotsApps = new PageDots(this, false);
         for (PageDots dd : new PageDots[]{dotsTop, dotsApps}) {
@@ -373,6 +371,7 @@ public class LauncherActivity extends BaseActivity {
         hlp.topMargin = Ui.dp(this, 14);
         root.addView(hud, hlp);
 
+        // Dock added last so it paints above scrolling content (liquid glass)
         dock = new DockView(this);
         root.addView(dock, new FrameLayout.LayoutParams(dockPx,
                 ViewGroup.LayoutParams.MATCH_PARENT, left ? Gravity.START : Gravity.END));
@@ -408,31 +407,6 @@ public class LauncherActivity extends BaseActivity {
             }
         });
 
-        // pasek gestu przy dolnej krawędzi: swipe-up otwiera Centrum Łączności
-        View gestureStrip = new View(this) {
-            private float downY;
-
-            @Override
-            public boolean onTouchEvent(MotionEvent e) {
-                switch (e.getActionMasked()) {
-                    case MotionEvent.ACTION_DOWN:
-                        downY = e.getRawY();
-                        return true;
-                    case MotionEvent.ACTION_UP:
-                        if (downY - e.getRawY() > 48f * getResources().getDisplayMetrics().density) {
-                            showOverlay(e.getRawX());
-                        }
-                        return true;
-                    default:
-                        return true;
-                }
-            }
-        };
-        FrameLayout.LayoutParams gslp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 18), Gravity.BOTTOM);
-        if (left) gslp.leftMargin = dockPx; else gslp.rightMargin = dockPx;
-        root.addView(gestureStrip, gslp);
-
         pager.setListener(new PagerView.Listener() {
             @Override
             public void onScroll(float pos) {
@@ -440,19 +414,16 @@ public class LauncherActivity extends BaseActivity {
                 bg.setParallax(Prefs.parallax(LauncherActivity.this) ? pos / total : 0f);
                 float t = Math.max(0f, Math.min(1f, pos - homeIdx));
                 dock.setBottomProgress(t);
-                // strona widżetów: jednolity mrok niezależnie od dnia – wyłączono przeplot
-                bg.setNightBlend(0f);
-                dock.setNightBlend(0f);
-
-                // liczba kropek = strony launchera przed biblioteką (bez biblioteki)
-                int pagesBeforeApps = appsStart;
-                int lastAppsIdx = appsStart + Math.max(0, appPages.size() - 1);
-                boolean onLastScreen = pos > lastAppsIdx - 0.5f;
-
-                dotsTop.setAlpha(onLastScreen ? 0f : (1f - t));
-                dotsApps.setAlpha(onLastScreen ? 0f : t);
-                dotsTop.set(pagesBeforeApps, Math.min(Math.round(pos), pagesBeforeApps - 1));
-                dotsApps.set(Math.max(1, appPages.size()), pos - appsStart);
+                // strona widżetów w trybie dziennym jest ciemna: dock i tło płynnie ciemnieją
+                float nb = (stacksPage != null && !night)
+                        ? Math.max(0f, Math.min(1f, homeIdx - pos)) : 0f;
+                bg.setNightBlend(nb);
+                dock.setNightBlend(nb);
+                dotsTop.setAlpha(1f - t);
+                dotsApps.setAlpha(t);
+                int topCount = homeIdx + 2;
+                dotsTop.set(topCount, Math.min(pos, topCount - 1));
+                dotsApps.set(appPages.size(), pos - appsStart);
             }
 
             @Override
@@ -467,6 +438,12 @@ public class LauncherActivity extends BaseActivity {
         dotsApps.setLight(!night);
         buildWidgetPages();
         assemblePages();
+        // Fix race condition: set page indicators immediately (report: Dot Indicators symmetry)
+        int topCount = homeIdx + 2;
+        dotsTop.set(topCount, homeIdx);
+        dotsApps.set(Math.max(1, appPages.size()), 0f);
+        dotsTop.setAlpha(1f);
+        dotsApps.setAlpha(0f);
         lastDockSig = "";
     }
 
@@ -525,7 +502,14 @@ public class LauncherActivity extends BaseActivity {
     }
 
     private void applyTheme() {
-        crossfadeSnapshot();
+        applyTheme(true);
+    }
+
+    /**
+     * @param notifyCircadian when false, skip outbound Circadian sync
+     *                        (incoming STATE_CHANGED already originated there)
+     */
+    private void applyTheme(boolean notifyCircadian) {
         bg.setStyle(Prefs.wallpaper(this), night);
         dotsTop.setLight(!night);
         dotsApps.setLight(!night);
@@ -541,6 +525,11 @@ public class LauncherActivity extends BaseActivity {
         }
         lastDockSig = "";
         refreshDock();
+        if (notifyCircadian
+                && Prefs.circadianAuto(this)
+                && pl.dock.widget.circadian.CircadianBridge.isInstalled(this)) {
+            pl.dock.widget.circadian.CircadianBridge.setNightMode(this, night);
+        }
     }
 
     // ---------------------------------------------------------------- dock
@@ -574,7 +563,6 @@ public class LauncherActivity extends BaseActivity {
         dock.setData(night, "glass".equals(Prefs.style(this)), clockText, s,
                 Prefs.showVoltage(this), ic);
         dock.setCarplayState(s.cp);
-        // kafelek "Telefon" pojawia się w aplikacjach tylko przy aktywnej sesji CarPlay
         int connected = s.cp == CarplayState.CONNECTED ? 1 : 0;
         if (connected != lastCp) {
             lastCp = connected;
@@ -628,6 +616,43 @@ public class LauncherActivity extends BaseActivity {
         p.addAction(Intent.ACTION_PACKAGE_REPLACED);
         p.addDataScheme("package");
         registerReceiver(pkgReceiver, p);
+
+        // Circadian Display ↔ Dock: natychmiastowa aktualizacja tapety / ikon
+        nightModeReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String a = intent.getAction();
+                if (a == null) return;
+                boolean fromCircadian =
+                        pl.dock.widget.circadian.CircadianBridge.ACTION_STATE_CHANGED.equals(a)
+                        || intent.getBooleanExtra("from_circadian", false);
+                boolean isNight;
+                if (fromCircadian
+                        || pl.dock.widget.circadian.CircadianBridge.ACTION_NIGHT.equals(a)
+                        || "pl.dock.widget.NIGHT_MODE_CHANGED".equals(a)) {
+                    isNight = intent.getBooleanExtra("isNight", night);
+                } else {
+                    return;
+                }
+                if (isNight == night && !fromCircadian) return;
+                night = isNight;
+                Look.wasNight = isNight;
+                // from Circadian: nie wywołuj setNightMode ponownie (pętla)
+                applyTheme(!fromCircadian);
+                // odśwież panel łączności (przyciski day/night / Night Shift), jeśli otwarty
+                if (panel != null) {
+                    try {
+                        panel.update();
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }
+        };
+        IntentFilter nf = new IntentFilter();
+        nf.addAction(pl.dock.widget.circadian.CircadianBridge.ACTION_STATE_CHANGED);
+        nf.addAction(pl.dock.widget.circadian.CircadianBridge.ACTION_NIGHT);
+        nf.addAction("pl.dock.widget.NIGHT_MODE_CHANGED");
+        registerReceiver(nightModeReceiver, nf);
     }
 
     private void unregisterReceivers() {
@@ -636,8 +661,10 @@ public class LauncherActivity extends BaseActivity {
         try {
             unregisterReceiver(statusReceiver);
             unregisterReceiver(pkgReceiver);
+            if (nightModeReceiver != null) unregisterReceiver(nightModeReceiver);
         } catch (Throwable ignored) {
         }
+        nightModeReceiver = null;
     }
 
     // ---------------------------------------------------------------- aplikacje
@@ -717,13 +744,6 @@ public class LauncherActivity extends BaseActivity {
         cp.builtinId = "carplay";
         cp.action = "carplay";
         out.add(cp);
-        if (StatusCenter.get(c).cp == CarplayState.CONNECTED) {
-            AppsGridPage.Item ph = new AppsGridPage.Item();
-            ph.label = "Telefon";
-            ph.builtinId = "phone";
-            ph.action = "phone";
-            out.add(ph);
-        }
         out.addAll(apps);
         return out;
     }
@@ -753,17 +773,6 @@ public class LauncherActivity extends BaseActivity {
                 public void onLong(AppsGridPage.Item it) {
                     appMenu(it);
                 }
-
-                @Override
-                public void onRemove(AppsGridPage.Item it) {
-                    if (it == null) return;
-                    if (it.entry != null) {
-                        Prefs.remove(LauncherActivity.this, it.entry.id);
-                    } else if (it.pkg != null && it.pkg.length() > 0) {
-                        Prefs.hideFromGrid(LauncherActivity.this, it.pkg);
-                    }
-                    loadApps();
-                }
             });
             appPages.add(p);
         }
@@ -773,48 +782,14 @@ public class LauncherActivity extends BaseActivity {
     }
 
     private void appMenu(final AppsGridPage.Item it) {
-        if (it.settings) {
-            Popups.menu(this, it.label, new String[]{"Informacje"},
-                    new Popups.OnSel() {
-                        @Override
-                        public void on(int i) { openSettings(); }
-                    });
-            return;
-        }
-        if (it.action.length() > 0) {
-            Popups.menu(this, it.label, new String[]{"Informacje"},
-                    new Popups.OnSel() {
-                        @Override
-                        public void on(int i) {
-                            Launch.carplay(LauncherActivity.this);
-                            overridePendingTransition(R.anim.cp_fade_in, R.anim.cp_fade_out);
-                        }
-                    });
-            return;
-        }
-        final String[] options = {
-                "Informacje o aplikacji",
-                "Usuń z siatki aplikacji",
-                "Odinstaluj"
-        };
-        Popups.menu(this, it.label, options, new Popups.OnSel() {
+        if (it.settings || it.action.length() > 0) return;
+        Popups.menu(this, it.label, new String[]{"Informacje o aplikacji"}, new Popups.OnSel() {
             @Override
             public void on(int i) {
-                if (i == 0) {
-                    try {
-                        startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                Uri.parse("package:" + it.pkg)));
-                    } catch (Throwable ignored) {}
-                } else if (i == 1) {
-                    Prefs.hideFromGrid(LauncherActivity.this, it.pkg);
-                    loadApps();
-                } else if (i == 2) {
-                    try {
-                        Intent un = new Intent(Intent.ACTION_UNINSTALL_PACKAGE,
-                                Uri.parse("package:" + it.pkg));
-                        un.putExtra(Intent.EXTRA_RETURN_RESULT, true);
-                        startActivityForResult(un, REQ_UNINSTALL);
-                    } catch (Throwable ignored) {}
+                try {
+                    startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + it.pkg)));
+                } catch (Throwable ignored) {
                 }
             }
         });
@@ -846,34 +821,6 @@ public class LauncherActivity extends BaseActivity {
     }
 
     // ---------------------------------------------------------------- centrum łączności (szkło)
-    // zrzut obecnego ekranu, który płynnie zanika po zmianie motywu (crossfade 350 ms)
-    private void crossfadeSnapshot() {
-        try {
-            if (root == null || root.getWidth() <= 0 || root.getHeight() <= 0) return;
-            if (Prefs.reduceMotion(this)) return;
-            Bitmap snap = Bitmap.createBitmap(root.getWidth(), root.getHeight(),
-                    Bitmap.Config.ARGB_8888);
-            Canvas cv = new Canvas(snap);
-            root.draw(cv);
-            final ImageView iv = new ImageView(this);
-            iv.setScaleType(ImageView.ScaleType.FIT_XY);
-            iv.setImageBitmap(snap);
-            root.addView(iv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT));
-            iv.animate().alpha(0f).setDuration(350)
-                    .withEndAction(new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                root.removeView(iv);
-                            } catch (Throwable ignored) {
-                            }
-                        }
-                    }).start();
-        } catch (Throwable ignored) {
-        }
-    }
-
     private void toggleOverlay() {
         if (overlay != null) {
             hideOverlay(true);
@@ -883,11 +830,6 @@ public class LauncherActivity extends BaseActivity {
     }
 
     private void showOverlay() {
-        showOverlay(-1f);
-    }
-
-    // xPx >= 0: panel centrujemy nad miejscem gestu (przypięcie do osi X)
-    private void showOverlay(float xPx) {
         Bitmap snap = null;
         try {
             int k = 6;
@@ -940,18 +882,6 @@ public class LauncherActivity extends BaseActivity {
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | (left ? Gravity.START : Gravity.END));
         lp.setMargins(left ? dockPx + Ui.dp(this, 8) : Ui.dp(this, 8), Ui.dp(this, 12),
                 left ? Ui.dp(this, 8) : dockPx + Ui.dp(this, 8), Ui.dp(this, 8));
-        if (xPx >= 0f) {
-            // centrowanie nad gestem: przesuwamy margines w osi X
-            int panelW = lp.width > 0 ? lp.width
-                    : Math.min(Ui.dp(this, 560), Ui.windowWidth(this) - Ui.dp(this, 24));
-            int cx = (int) xPx - panelW / 2;
-            int maxM = Ui.windowWidth(this) - panelW - Ui.dp(this, 8);
-            cx = Math.max(Ui.dp(this, 8), Math.min(cx, maxM));
-            lp.width = panelW;
-            lp.gravity = Gravity.TOP | Gravity.LEFT;
-            if (left) cx = Math.max(cx, dockPx + Ui.dp(this, 8));
-            lp.leftMargin = cx;
-        }
         overlay.addView(panel, lp);
         root.addView(overlay, root.indexOfChild(dock), new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -969,17 +899,29 @@ public class LauncherActivity extends BaseActivity {
     private void hideOverlay(boolean animate) {
         final FrameLayout ov = overlay;
         if (ov == null) return;
+        final ConnectivityPanel p = panel;
         overlay = null;
         panel = null;
-        if (!animate) {
+        if (!animate || Prefs.reduceMotion(this)) {
             root.removeView(ov);
             return;
         }
-        ov.animate().alpha(0f).setDuration(Prefs.reduceMotion(this) ? 0 : 180)
+        // Reverse of open: fade + slight scale/translate, then remove after animation ends
+        if (p != null) {
+            p.animate()
+                    .scaleX(0.92f).scaleY(0.92f)
+                    .translationY(-Ui.dp(LauncherActivity.this, 18))
+                    .setDuration(220)
+                    .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                    .start();
+        }
+        ov.animate().alpha(0f).setDuration(220)
+                .setInterpolator(new android.view.animation.AccelerateInterpolator())
                 .setListener(new AnimatorListenerAdapter() {
                     @Override
                     public void onAnimationEnd(Animator a) {
                         root.removeView(ov);
+                        ov.animate().setListener(null);
                     }
                 }).start();
     }
@@ -1222,11 +1164,6 @@ public class LauncherActivity extends BaseActivity {
             } else {
                 cancelPending();
             }
-        } else if (req == REQ_UNINSTALL) {
-            // odświeżamy siatkę po odinstalowaniu aplikacji
-            loadApps();
-            lastDockSig = "";
-            refreshDock();
         }
     }
 
