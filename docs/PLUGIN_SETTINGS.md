@@ -1,6 +1,3 @@
-
-
-
 # Dock – współpraca z innymi aplikacjami (instrukcja dla projektów OBD2 Dashboard, DiPlay, mapy)
 
 Ten dokument można wkleić do osobnego projektu jako polecenie. Dock to launcher na tablet

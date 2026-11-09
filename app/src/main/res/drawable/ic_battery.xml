@@ -4,18 +4,13 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- body outline -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.8"
-        android:pathData="M4,8 L18,8 A1.5,1.5 0 0 1 19.5,9.5 L19.5,14.5 A1.5,1.5 0 0 1 18,16 L4,16 A1.5,1.5 0 0 1 2.5,14.5 L2.5,9.5 A1.5,1.5 0 0 1 4,8 Z" />
-    <!-- terminal nub -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M20.5,10.5 L21.5,10.5 A0.5,0.5 0 0 1 22,11 L22,13 A0.5,0.5 0 0 1 21.5,13.5 L20.5,13.5 Z" />
-    <!-- fill level (70%) -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M4,9.5 L15.5,9.5 L15.5,14.5 L4,14.5 Z" />
+        android:fillType="evenOdd"
+        android:pathData="M6.5,3h3v2h5V3h3v2H20a1,1 0 0 1 1,1v12a1,1 0 0 1 -1,1H4a1,1 0 0 1 -1,-1V6a1,1 0 0 1 1,-1h2.5zM4.8,7v10h14.4V7zM8,11.2h1.3v-1.5h1.4v1.5H12v1.3h-1.3V14H9.3v-1.5H8zM13.8,11.2h3.2v1.3h-3.2z" />
 </vector>
+
+
+
+
+

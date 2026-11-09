@@ -1,32 +1,31 @@
-
-
 # Dock 2.0 (CarPlay Launcher)
 
-Android launcher for car tablets (API 26+, target 28 / Android 9).  
+Android launcher for car tablets (API 26+, target 28 / Android 9 Automotive).  
 Application ID: `pl.dock.widget`
 
-## What’s new in this package (Night Shift rework, no Circadian)
+## Applied architectural upgrades (from full refactor report)
 
-- **Night Shift Kelvin** – colour computed from blackbody curve (6500 K → 2200 K)
-  instead of fixed amber; two layers (black dim + warmth) with independent alpha.
-- **Removed Circadian integration** – no `pl.dock.widget.circadian.*`, no external
-  broadcasts. Single source of truth for screen colour is `NightShiftService`.
-- **Smooth fade in/out** – `ValueAnimator` from/to zero alpha on the overlay.
-- Fixed `SYSTEM_UI_FLAG_VISIBLE` in `ConfigActivity`, `ConnectivityActivity`,
-  `NowPlayingActivity` → status bar hidden but pullable (IMMERSIVE_STICKY).
-- Icon refresh: CarPlay mark (thicker arc + centred triangle), tether chain
-  (heavier links), battery rectangle with proportional fill.
-- Widgets: `Ui.ringCard` now translucent (`0xB3101012` night / `0xBFFFFFFF` day) with
-  top glass gradient; Weather card joined the same style.
-- App grid: long-press background enters edit mode; minus badge triggers 220 ms
-  shrink-and-fade animation before removal; context menu has „Informacje /
-  Usuń z siatki / Odinstaluj”.
-- Page dots: count excludes the App Library screen; auto-hide on last screen.
+- **Sensor Fusion CarPlay state** – Notification + MediaSession + UsageStats (CarPlayHost) + USB Apple VID; robust CONNECTING / CONNECTED indicators.
+- **Liquid Glass Z-order** – full-width pager under dock; software multi-pass blur; transparent dock regions pass scroll.
+- **Page Dots race fixed** – indicators computed and set immediately after page assembly (no hardcoded 3-dot flash).
+- **EditModeController + Wobble** – global edit mode with phase-offset sine rotation for icons / tiles.
+- **HOME / projection switch** – zero-animation transitions, singleTask launcher, DiPlay host restore.
+- **Night Shift tri-state path** + CircadianBridge, OEM Hotspot/BT fallbacks, STREAM_MUSIC volume HUD + SWC observer.
+- **Dock persistence** across settings push/pop navigation.
+
+## What’s new in this package (Dock 2.0 + Circadian + wake-up fix)
+
+## What’s new in this package (Dock 2.0 + Circadian + wake-up fix)
+
+- **MediaHub retention** – after tablet sleep/wake, album art and track metadata are kept when the CarPlay session is briefly destroyed and recreated; no more note placeholder flash.
+- **Dock overlay layout** – home/apps pager is full-width; dock draws on top (true liquid-glass underlay). Empty dock space passes scroll gestures.
+- **Connectivity panel close animation** – reverse scale/fade matching open animation.
+- **Circadian Display bridge** – auto-activate night profile via ContentProvider + broadcast.
 - **Backup / restore** – export/import all Dock prefs as JSON.
 - **Apple-like push/pop** animations in settings, recent-apps long-press on dock bottom.
 - **CarPlay reconnecting spinner** (amber ring) when phone is detected but not connected.
 - **Extended app Overrides** (LocalSend→AirDrop, F-Droid→App Store, Material Files→Pliki, …).
-- **Unified settings hub** already present; backup section added.
+- **Unified settings hub** already present; Circadian + backup sections added.
 
 ## What’s new in this package (Dock 2.0 foundation)
 

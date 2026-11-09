@@ -15,9 +15,8 @@
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <!-- Night Shift (filtr barwy ekranu) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <!-- wykrywanie aktywnego CarPlay (DiPlay na pierwszym planie) -->
-    <uses-permission
-        android:name="android.permission.PACKAGE_USAGE_STATS"
+    <!-- Sensor Fusion: UsageStats for CarPlayHostActivity detection -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
     <application
@@ -130,11 +129,6 @@
             android:name=".NightShiftService"
             android:exported="false" />
 
-        <!-- gest od dołu ekranu otwiera Centrum Łączności nad innymi aplikacjami -->
-        <service
-            android:name=".ControlCenterGestureService"
-            android:exported="false" />
-
         <!-- Dostęp do sesji multimedialnych (DiPlay) i powiadomień – włączany ręcznie przez użytkownika -->
         <service
             android:name=".DockNotificationListener"
@@ -150,7 +144,15 @@
             android:authorities="pl.dock.widget.state"
             android:exported="true" />
 
-        <!-- (removed) Circadian Display bridge receiver -->
+        <!-- Circadian Display ↔ Dock night-mode bridge -->
+        <receiver
+            android:name=".circadian.NightModeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="pl.circadiandisplay.STATE_CHANGED" />
+                <action android:name="pl.dock.widget.NIGHT_MODE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>

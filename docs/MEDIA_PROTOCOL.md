@@ -1,5 +1,3 @@
-
-
 # Media Protocol
 
 ## Snapshot fields

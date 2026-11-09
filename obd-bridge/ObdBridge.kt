@@ -1,6 +1,3 @@
-
-
-
 package com.miskibin.obd2dashboard   // <- dopasuj do pakietu aplikacji OBD2 Dashboard
 
 import android.content.Context

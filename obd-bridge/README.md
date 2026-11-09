@@ -1,6 +1,3 @@
-
-
-
 # Napięcie z OBD2 Dashboard do Docka
 
 OBD2 Dashboard (github.com/miskibin/obd2-dashboard) czyta dane z adaptera ELM327 przez BLE
