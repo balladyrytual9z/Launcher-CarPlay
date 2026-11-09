@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.content.Context;
@@ -276,7 +273,6 @@ public class CardWidgets {
 
         @Override
         protected void onDraw(Canvas cv) {
-            card(cv);
             float w = getWidth();
             float h = getHeight();
             if (!WeatherData.ok) {

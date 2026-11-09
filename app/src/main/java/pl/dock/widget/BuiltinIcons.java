@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.graphics.Bitmap;
@@ -256,14 +253,16 @@ public class BuiltinIcons {
             c.drawCircle(34 * u, 70 * u, 3 * u, w);
             c.drawCircle(66 * u, 70 * u, 3 * u, w);
         } else if ("phone".equals(id)) {
+            c.save();
+            c.rotate(-45, 50 * u, 50 * u);
             Paint g = f(GREEN);
-            Path hs = new Path();
-            hs.addArc(rc(u, 18, 18, 82, 82), 180, 90);
-            hs.arcTo(rc(u, 32, 32, 68, 68), 270, -90);
-            hs.close();
-            c.drawPath(hs, g);
-            c.drawCircle(27 * u, 50 * u, 7 * u, g);
-            c.drawCircle(50 * u, 27 * u, 7 * u, g);
+            // Klasyczna słuchawka: korpus + dwie muszle
+            c.drawRoundRect(rc(u, 44, 22, 56, 78), 6 * u, 6 * u, g);
+            c.drawRoundRect(rc(u, 32, 16, 68, 34), 9 * u, 9 * u, g);
+            c.drawRoundRect(rc(u, 32, 66, 68, 84), 9 * u, 9 * u, g);
+            // Wgłębienie na głośnik (środkowa listwa)
+            c.drawRect(rc(u, 46, 34, 54, 40), f(DARK));
+            c.restore();
         } else if ("music".equals(id)) {
             Paint pk = f(PINK);
             c.drawOval(rc(u, 26, 60, 48, 76), pk);
@@ -352,18 +351,20 @@ public class BuiltinIcons {
             c.drawOval(rc(u, 38, 22, 62, 78), s(BLUE, 4 * u));
             c.drawLine(22 * u, 50 * u, 78 * u, 50 * u, s(BLUE, 4 * u));
         } else if ("airdrop".equals(id)) {
-            Paint ar = s(BLUE, 6 * u);
-            ar.setStrokeCap(Paint.Cap.ROUND);
-            c.drawCircle(50 * u, 62 * u, 6 * u, f(BLUE));
-            c.drawArc(rc(u, 38, 50, 62, 74), 210, 120, false, ar);
-            c.drawArc(rc(u, 28, 40, 72, 84), 210, 120, false, ar);
-            c.drawArc(rc(u, 18, 30, 82, 94), 210, 120, false, ar);
+            Paint ar = s(BLUE, 5.5f * u);
+            c.drawCircle(50 * u, 66 * u, 4.5f * u, f(BLUE));
+            // Symetryczne łuki względem osi X=50
+            c.drawArc(rc(u, 38, 54, 62, 78), 218, 104, false, ar);
+            c.drawArc(rc(u, 28, 44, 72, 88), 218, 104, false, ar);
+            c.drawArc(rc(u, 18, 34, 82, 98), 218, 104, false, ar);
         } else if ("appstore".equals(id)) {
-            Paint st = s(BLUE, 7.5f * u);
-            st.setStrokeCap(Paint.Cap.ROUND);
-            c.drawLine(33 * u, 68 * u, 50 * u, 30 * u, st);
-            c.drawLine(67 * u, 68 * u, 50 * u, 30 * u, st);
-            c.drawLine(39 * u, 55 * u, 61 * u, 55 * u, st);
+            Paint st = s(BLUE, 6.5f * u);
+            // Litery "A" jak w logo App Store (trójkąt z poprzeczką)
+            c.drawLine(50 * u, 22 * u, 26 * u, 72 * u, st);
+            c.drawLine(50 * u, 22 * u, 74 * u, 72 * u, st);
+            c.drawLine(36 * u, 55 * u, 64 * u, 55 * u, st);
+            // Dodatkowe kreski charakterystyczne dla logo App Store
+            c.drawLine(28 * u, 78 * u, 72 * u, 78 * u, s(BLUE, 5f * u));
         } else if ("appearance".equals(id)) {
             c.drawCircle(50 * u, 50 * u, 26 * u, s(WHITE, 5 * u));
             c.drawArc(rc(u, 24, 24, 76, 76), 90, 180, true, f(WHITE));

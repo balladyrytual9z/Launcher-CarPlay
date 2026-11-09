@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.content.BroadcastReceiver;
@@ -11,8 +8,6 @@ public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         StatusService.start(context);
-        ControlCenterGestureService.start(context);
-        NightShift.restore(context);
     }
 }
 

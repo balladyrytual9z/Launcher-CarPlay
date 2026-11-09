@@ -1,6 +1,3 @@
-
-
-
 package pl.dock.widget;
 
 import android.content.Context;
@@ -9,7 +6,6 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.os.Handler;
-import android.os.SystemClock;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.view.MotionEvent;
@@ -41,8 +37,6 @@ public class AppsGridPage extends View {
         void onTap(Item it);
 
         void onLong(Item it);
-
-        void onRemove(Item it);
     }
 
     private final float d;
@@ -55,106 +49,18 @@ public class AppsGridPage extends View {
     private final RectF r = new RectF();
     private float sc = 1f, iconSz, colPitch, rowPitch, left, top, pillH, labelMax;
     private int pressed = -1;
-    private int removingIdx = -1;
-    private float removingScale = 1f;
-    private long removingStart = 0L;
     private float downX, downY;
     private boolean longFired;
     private final Handler h = new Handler();
     private final int slop;
-    // ---------- tryb edycji (iOS-style jiggle) ----------
-    private boolean editMode;
-    private final float[] wobblePhase = new float[PER_PAGE];
-    private long lastWobble;
-    private final Paint badge = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Runnable wobbleTick = new Runnable() {
-        @Override
-        public void run() {
-            if (!editMode) return;
-            long now = SystemClock.uptimeMillis();
-            if (lastWobble != 0) {
-                for (int i = 0; i < PER_PAGE; i++) {
-                    wobblePhase[i] = (wobblePhase[i] + (now - lastWobble) / 400f) % 1f;
-                }
-            }
-            lastWobble = now;
-            invalidate();
-            h.postDelayed(this, 16);
-        }
-    };
-
-    public void enterEditMode() {
-        if (editMode) return;
-        editMode = true;
-        lastWobble = 0;
-        EditModeController.get().setEditMode(true);
-        h.postDelayed(wobbleTick, 16);
-        invalidate();
-    }
-
-    public void exitEditMode() {
-        if (!editMode) return;
-        editMode = false;
-        h.removeCallbacks(wobbleTick);
-        lastWobble = 0;
-        EditModeController.get().setEditMode(false);
-        invalidate();
-    }
-
-    public boolean isEditing() {
-        return editMode;
-    }
-
-    private float itemX(int i) {
-        return left + (i % COLS) * colPitch;
-    }
-
-    private float itemY(int i) {
-        return top + (i / COLS) * rowPitch;
-    }
-
-    private void drawRemoveBadge(Canvas cv, float cx, float cy) {
-        float rad = 14f * d * sc;
-        badge.setStyle(Paint.Style.FILL);
-        badge.setColor(0xE61C1C1E);
-        cv.drawCircle(cx, cy, rad, badge);
-        badge.setStyle(Paint.Style.STROKE);
-        badge.setStrokeWidth(3f * d * sc);
-        badge.setStrokeCap(Paint.Cap.ROUND);
-        badge.setColor(0xFFFFFFFF);
-        float k = rad * 0.42f;
-        cv.drawLine(cx - k, cy - k, cx + k, cy + k, badge);
-        cv.drawLine(cx - k, cy + k, cx + k, cy - k, badge);
-    }
-
-    private int hitRemoveBadge(float x, float y) {
-        float rad = 16f * d * sc;
-        for (int i = items.size() - 1; i >= 0; i--) {
-            float cx = itemX(i) + iconSz;
-            float cy = itemY(i);
-            if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= rad * rad) return i;
-        }
-        return -1;
-    }
     private final Runnable longPress = new Runnable() {
         @Override
         public void run() {
             if (pressed >= 0 && pressed < items.size() && listener != null) {
                 longFired = true;
-                if (!editMode) enterEditMode();
                 listener.onLong(items.get(pressed));
                 pressed = -1;
                 invalidate();
-            }
-        }
-    };
-
-    // long-press on empty background enters edit mode (iOS 26 style)
-    private final Runnable bgLongPress = new Runnable() {
-        @Override
-        public void run() {
-            if (pressed < 0 && !editMode) {
-                enterEditMode();
             }
         }
     };
@@ -181,11 +87,16 @@ public class AppsGridPage extends View {
     @Override
     protected void onSizeChanged(int w, int hh, int ow, int oh) {
         super.onSizeChanged(w, hh, ow, oh);
-        sc = Math.min(1f, Math.min(w / (773f * d), hh / (520f * d)));
+        // Keep grid clear of the dock overlay while still allowing liquid-glass underlap
+        float dockInset = Ui.dp(getContext(), Ui.DOCK_OFFSET_DP) * 0.55f;
+        boolean dockLeft = Ui.dockLeft(getContext());
+        float usableW = w - dockInset;
+        sc = Math.min(1f, Math.min(usableW / (773f * d), hh / (520f * d)));
         iconSz = 85f * d * sc;
         colPitch = 162f * d * sc;
         rowPitch = 160f * d * sc;
-        left = (w - (4 * colPitch + iconSz)) / 2f;
+        float gridW = 4 * colPitch + iconSz;
+        left = (dockLeft ? dockInset : 0) + (usableW - gridW) / 2f;
         top = 34f * d * sc;
         pillH = 29f * d * sc;
         labelMax = colPitch - 14f * d * sc;
@@ -215,13 +126,6 @@ public class AppsGridPage extends View {
         pill.setColor(night ? 0xB31E1E20 : 0xCCFFFFFF);
         text.setColor(night ? 0xFFFFFFFF : 0xFF111114);
         for (int i = 0; i < items.size(); i++) {
-            if (i == removingIdx) {
-                // animated icon: scale + alpha shrink linearly over 220 ms
-                float t = (android.os.SystemClock.uptimeMillis() - removingStart) / 220f;
-                if (t > 1f) t = 1f;
-                removingScale = 1f - t;
-                if (removingScale <= 0.01f) continue;
-            }
             Item it = items.get(i);
             int row = i / COLS;
             int col = i % COLS;
@@ -229,21 +133,10 @@ public class AppsGridPage extends View {
             float y = top + row * rowPitch;
             Bitmap b = bitmapFor(it);
             float s = (pressed == i) ? 0.93f : 1f;
-            if (i == removingIdx) s *= removingScale;
             float inset = iconSz * (1f - s) / 2f;
-            int alpha = pressed == i ? 190 : 255;
-            if (i == removingIdx) alpha = (int) (255 * removingScale);
-            bmp.setAlpha(alpha);
+            bmp.setAlpha(pressed == i ? 190 : 255);
             r.set(x + inset, y + inset, x + iconSz - inset, y + iconSz - inset);
-            if (editMode) {
-                cv.save();
-                float ang = (float) Math.sin(wobblePhase[i % PER_PAGE] * Math.PI * 2) * 1.8f;
-                cv.rotate(ang, x + iconSz / 2f, y + iconSz / 2f);
-                cv.drawBitmap(b, null, r, bmp);
-                cv.restore();
-            } else {
-                cv.drawBitmap(b, null, r, bmp);
-            }
+            cv.drawBitmap(b, null, r, bmp);
 
             float pw = it.textW + 24f * d * sc;
             float px = x + iconSz / 2f - pw / 2f;
@@ -252,7 +145,6 @@ public class AppsGridPage extends View {
             cv.drawRoundRect(r, pillH / 2f, pillH / 2f, pill);
             cv.drawText(it.shown, x + iconSz / 2f,
                     py + pillH / 2f - (text.descent() + text.ascent()) / 2f, text);
-            if (editMode && i != removingIdx) drawRemoveBadge(cv, x + iconSz, y);
         }
     }
 
@@ -277,17 +169,9 @@ public class AppsGridPage extends View {
                 downY = e.getY();
                 longFired = false;
                 pressed = hit(downX, downY);
-                if (pressed < 0) {
-                    // long-press on the empty background = edit mode
-                    if (!editMode) {
-                        h.postDelayed(bgLongPress, ViewConfiguration.getLongPressTimeout());
-                    }
-                    return true;
-                }
+                if (pressed < 0) return false;
                 invalidate();
-                if (!editMode) {
-                    h.postDelayed(longPress, ViewConfiguration.getLongPressTimeout());
-                }
+                h.postDelayed(longPress, ViewConfiguration.getLongPressTimeout());
                 return true;
             case MotionEvent.ACTION_MOVE:
                 if (pressed >= 0 && (Math.abs(e.getX() - downX) > slop
@@ -296,40 +180,18 @@ public class AppsGridPage extends View {
                     pressed = -1;
                     invalidate();
                 }
-                if (Math.abs(e.getX() - downX) > slop
-                        || Math.abs(e.getY() - downY) > slop) {
-                    h.removeCallbacks(bgLongPress);
-                }
                 return true;
             case MotionEvent.ACTION_UP:
                 h.removeCallbacks(longPress);
-                h.removeCallbacks(bgLongPress);
                 int p = pressed;
                 pressed = -1;
                 invalidate();
-                if (editMode) {
-                    int bIdx = hitRemoveBadge(e.getX(), e.getY());
-                    if (bIdx >= 0 && bIdx < items.size() && listener != null) {
-                        final Item removed = items.get(bIdx);
-                        animateRemoveBadge(removed);
-                        h.postDelayed(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (listener != null) listener.onRemove(removed);
-                            }
-                        }, 220);
-                        return true;
-                    }
-                    if (p < 0) exitEditMode();
-                    return true;
-                }
                 if (p >= 0 && !longFired && p < items.size() && listener != null) {
                     listener.onTap(items.get(p));
                 }
                 return true;
             case MotionEvent.ACTION_CANCEL:
                 h.removeCallbacks(longPress);
-                h.removeCallbacks(bgLongPress);
                 pressed = -1;
                 invalidate();
                 return true;
@@ -342,28 +204,6 @@ public class AppsGridPage extends View {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         h.removeCallbacks(longPress);
-        h.removeCallbacks(bgLongPress);
-        h.removeCallbacks(wobbleTick);
-    }
-
-    // iOS 26: icon shrinks and fades out (220 ms), then the callback removes it
-    private void animateRemoveBadge(Item it) {
-        final int idx = items.indexOf(it);
-        if (idx < 0) return;
-        removingIdx = idx;
-        removingStart = android.os.SystemClock.uptimeMillis();
-        h.postDelayed(new Runnable() {
-            @Override public void run() {
-                removingIdx = -1;
-                invalidate();
-            }
-        }, 220);
-    }
-
-    @Override
-    public void setVisibility(int v) {
-        super.setVisibility(v);
-        if (v != VISIBLE && editMode) exitEditMode();
     }
 }
 
