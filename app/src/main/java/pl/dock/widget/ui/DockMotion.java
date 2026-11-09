@@ -1,5 +1,3 @@
-
-
 package pl.dock.widget.ui;
 
 import android.animation.TimeInterpolator;

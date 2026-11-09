@@ -1,9 +1,5 @@
-
-
-
 package pl.dock.widget;
 
-import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -16,9 +12,7 @@ import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 // Strona z widżetami ułożonymi w kolumnach (stosach). W każdej kolumnie widać jeden widżet;
 // kolejne można przełączać kropkami po prawej stronie kolumny.
@@ -53,76 +47,12 @@ public class WidgetPage extends ViewGroup {
             if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
             if (cb == null) return;
             if (pressEntry != null) {
-                if (!editMode) enterEditMode();
                 cb.onMenu(pressEntry);
             } else {
                 cb.onEmptyLong();
             }
         }
     };
-
-    // ---------- tryb edycji ----------
-    private boolean editMode;
-    private final Map<View, ObjectAnimator> wobbles = new HashMap<View, ObjectAnimator>();
-    private final Paint badgeP = new Paint(Paint.ANTI_ALIAS_FLAG);
-
-    public void enterEditMode() {
-        if (editMode) return;
-        editMode = true;
-        EditModeController.get().setEditMode(true);
-        for (int i = 0; i < getChildCount(); i++) {
-            View v = getChildAt(i);
-            if (!(v.getTag() instanceof WidgetEntry) || v.getVisibility() != VISIBLE) continue;
-            ObjectAnimator a = ObjectAnimator.ofFloat(v, "rotation", -1.5f, 1.5f);
-            a.setDuration(120);
-            a.setRepeatMode(ObjectAnimator.REVERSE);
-            a.setRepeatCount(ObjectAnimator.INFINITE);
-            a.start();
-            wobbles.put(v, a);
-        }
-        invalidate();
-    }
-
-    public void exitEditMode() {
-        if (!editMode) return;
-        editMode = false;
-        EditModeController.get().setEditMode(false);
-        for (ObjectAnimator a : wobbles.values()) a.cancel();
-        wobbles.clear();
-        for (int i = 0; i < getChildCount(); i++) getChildAt(i).setRotation(0f);
-        invalidate();
-    }
-
-    public boolean isEditing() {
-        return editMode;
-    }
-
-    // widżet pod palcem (bez kropki "–")
-    private View widgetAt(float x, float y) {
-        for (int i = getChildCount() - 1; i >= 0; i--) {
-            View v = getChildAt(i);
-            if (v.getVisibility() != VISIBLE || !(v.getTag() instanceof WidgetEntry)) continue;
-            if (x >= v.getLeft() && x <= v.getRight() && y >= v.getTop() && y <= v.getBottom()) {
-                return v;
-            }
-        }
-        return null;
-    }
-
-    // znaczek "–" w lewym górnym rogu widżetu
-    private WidgetEntry badgeAt(float x, float y) {
-        float rad = 18f * d;
-        for (int i = getChildCount() - 1; i >= 0; i--) {
-            View v = getChildAt(i);
-            if (v.getVisibility() != VISIBLE || !(v.getTag() instanceof WidgetEntry)) continue;
-            float cx = v.getLeft() + 6f * d;
-            float cy = v.getTop() + 6f * d;
-            if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= rad * rad) {
-                return (WidgetEntry) v.getTag();
-            }
-        }
-        return null;
-    }
 
     public WidgetPage(Context c, String[] wheres, boolean cards) {
         super(c);
@@ -278,24 +208,6 @@ public class WidgetPage extends ViewGroup {
                 cv.drawCircle(x, y0 + k * 16f * d, 3.6f * d, paint);
             }
         }
-        // znaczki "–" w trybie edycji
-        if (editMode) {
-            for (int i = 0; i < getChildCount(); i++) {
-                View v = getChildAt(i);
-                if (v.getVisibility() != VISIBLE || !(v.getTag() instanceof WidgetEntry)) continue;
-                float cx = v.getLeft() + 6f * d;
-                float cy = v.getTop() + 6f * d;
-                float rad = 9f * d;
-                badgeP.setColor(0xFFFF3B30);
-                badgeP.setStyle(Paint.Style.FILL);
-                cv.drawCircle(cx, cy, rad, badgeP);
-                badgeP.setColor(0xFFFFFFFF);
-                badgeP.setStyle(Paint.Style.STROKE);
-                badgeP.setStrokeWidth(2.2f * d);
-                badgeP.setStrokeCap(Paint.Cap.ROUND);
-                cv.drawLine(cx - 4f * d, cy, cx + 4f * d, cy, badgeP);
-            }
-        }
     }
 
     // ---------------------------------------------------------------- dotyk
@@ -325,7 +237,6 @@ public class WidgetPage extends ViewGroup {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent e) {
-        if (editMode) return true;
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 downX = e.getX();
@@ -358,15 +269,6 @@ public class WidgetPage extends ViewGroup {
                 return true;
             case MotionEvent.ACTION_UP:
                 h.removeCallbacks(longPress);
-                if (editMode) {
-                    WidgetEntry b = badgeAt(e.getX(), e.getY());
-                    if (b != null) {
-                        if (cb != null) cb.onMenu(b);
-                    } else if (widgetAt(e.getX(), e.getY()) == null) {
-                        exitEditMode();
-                    }
-                    return true;
-                }
                 if (!longFired) {
                     String w = dotsAt(e.getX(), e.getY());
                     if (w != null) cycle(w);
@@ -384,7 +286,6 @@ public class WidgetPage extends ViewGroup {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         h.removeCallbacks(longPress);
-        exitEditMode();
     }
 
     // ---------------------------------------------------------------- pusty kafelek "+"

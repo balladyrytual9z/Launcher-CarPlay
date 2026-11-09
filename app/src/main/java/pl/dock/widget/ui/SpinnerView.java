@@ -1,4 +1,3 @@
-
 package pl.dock.widget.ui;
 
 import android.content.Context;

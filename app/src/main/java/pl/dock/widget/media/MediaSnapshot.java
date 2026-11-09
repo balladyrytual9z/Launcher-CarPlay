@@ -1,5 +1,3 @@
-
-
 package pl.dock.widget.media;
 
 import android.graphics.Bitmap;

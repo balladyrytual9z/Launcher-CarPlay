@@ -1,4 +1,3 @@
-
 package pl.dock.widget.backup;
 
 import android.content.Context;
@@ -12,6 +11,7 @@ import java.io.OutputStream;
 import java.util.Iterator;
 import java.util.Map;
 import pl.dock.widget.Prefs;
+import pl.dock.widget.circadian.CircadianBridge;
 
 public final class BackupManager {
     public static final String VERSION = "1";
@@ -27,6 +27,20 @@ public final class BackupManager {
             prefs.put(e.getKey(), String.valueOf(e.getValue()));
         }
         root.put("prefs", prefs);
+        if (CircadianBridge.isInstalled(c)) {
+            try {
+                android.os.Bundle b = c.getContentResolver().call(
+                        android.net.Uri.parse("content://" + CircadianBridge.AUTHORITY),
+                        "get_profile_start", null, null);
+                if (b != null) {
+                    JSONObject circ = new JSONObject();
+                    circ.put("start_minutes", b.getInt("start_minutes", 0));
+                    circ.put("auto_night", b.getBoolean("auto_night", false));
+                    circ.put("profile_name", b.getString("profile_name", ""));
+                    root.put("circadian", circ);
+                }
+            } catch (Throwable ignored) {}
+        }
         return root.toString(2);
     }
 
